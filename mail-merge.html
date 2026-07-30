@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mail Merge Template Designer</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js" referrerpolicy="origin"></script>
+<style>
+:root{
+  --navy:#132844;
+  --navy-2:#1c3a5e;
+  --accent:#2f6fed;
+  --accent-2:#1b4fc9;
+  --paper:#f3f5f9;
+  --line:#d8dee8;
+  --ink:#1b2430;
+  --muted:#67748c;
+  --danger:#d64545;
+  --danger-bg:#fdeaea;
+  --ok:#1e9e63;
+  --chip:#e8f0ff;
+  --chip-border:#a9c4fb;
+  --radius:10px;
+  --font-ui: "Segoe UI", "Inter", system-ui, -apple-system, Arial, sans-serif;
+  --font-doc: "Calibri", "Carlito", Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  font-family:var(--font-ui);
+  color:var(--ink);
+  background:var(--paper);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* ---------- Topbar ---------- */
+#topbar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; gap:10px;
+  padding:10px 16px;
+  background:linear-gradient(180deg, rgba(19,40,68,.96), rgba(19,40,68,.90));
+  backdrop-filter:blur(10px);
+  color:#fff;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  flex-wrap:wrap;
+}
+#topbar .brand{font-weight:700; letter-spacing:.2px; font-size:15px; margin-right:6px; white-space:nowrap;}
+#topbar .brand span{color:#8fb4ff;}
+.tb-group{display:flex; align-items:center; gap:6px; padding:4px 8px; border-right:1px solid rgba(255,255,255,.12);}
+.tb-group:last-child{border-right:none;}
+.btn{
+  appearance:none; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06);
+  color:#fff; padding:7px 12px; border-radius:8px; font-size:13px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap; transition:.15s;
+}
+.btn:hover{background:rgba(255,255,255,.16);}
+.btn.primary{background:var(--accent); border-color:var(--accent-2);}
+.btn.primary:hover{background:var(--accent-2);}
+.btn.ghost{background:transparent;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+.btn.sm{padding:5px 9px; font-size:12px;}
+select, input[type=text], input[type=number]{
+  font-family:var(--font-ui); font-size:13px; padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:#fff; color:var(--ink);
+}
+#topbar select{background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.2);}
+#topbar select option{color:#111;}
+#fileInput{display:none;}
+.record-nav{display:flex; align-items:center; gap:6px;}
+.record-nav input{width:56px; text-align:center;}
+.record-pill{font-size:12px; color:#cfe0ff; white-space:nowrap;}
+
+/* ---------- Layout ---------- */
+#app{flex:1; display:flex; min-height:0;}
+#sidebar{
+  width:270px; min-width:220px; background:#fff; border-right:1px solid var(--line);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+#sidebar .sb-head{padding:12px 14px 8px; border-bottom:1px solid var(--line);}
+#sidebar .sb-head h3{margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);}
+#fieldSearch{width:100%;}
+#missingBanner{
+  display:none; background:var(--danger-bg); color:#8a2323; border-bottom:1px solid #f3caca;
+  padding:10px 14px; font-size:12.5px; line-height:1.5;
+}
+#missingBanner strong{display:block; margin-bottom:4px;}
+.remap-row{display:flex; align-items:center; gap:6px; margin-top:4px;}
+.remap-row select{flex:1; font-size:12px; padding:4px 6px;}
+#fieldList{flex:1; overflow:auto; padding:8px;}
+.mf-item{
+  display:flex; align-items:center; gap:8px; padding:8px 10px; margin-bottom:6px; border-radius:8px;
+  background:var(--chip); border:1px solid var(--chip-border); cursor:grab; user-select:none;
+}
+.mf-item:active{cursor:grabbing;}
+.mf-item .mfi-ico{font-size:14px;}
+.mf-item .mfi-name{flex:1; font-size:12.5px; font-weight:600; color:#1e3a6e; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.mf-item .mfi-actions{display:flex; gap:3px; opacity:0; transition:.15s;}
+.mf-item:hover .mfi-actions{opacity:1;}
+.mfi-actions button{border:none; background:transparent; cursor:pointer; font-size:12px; color:#3a5590; padding:2px 4px; border-radius:4px;}
+.mfi-actions button:hover{background:rgba(0,0,0,.08);}
+.mf-item.pinned{background:#fff6df; border-color:#f0d78c;}
+.mf-item.pinned .mfi-name{color:#7a5c00;}
+.sb-empty{color:var(--muted); font-size:12.5px; padding:20px 12px; text-align:center;}
+#sidebar .sb-foot{padding:10px 14px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted);}
+
+#center{flex:1; display:flex; flex-direction:column; min-width:0;}
+/* #editorToolbar is now just the mount point real TinyMCE renders its own
+   menubar + toolbar into (via fixed_toolbar_container-free classic mode,
+   it sits directly above the iframe) — no custom flex/button styling needed. */
+#editorToolbar{ background:#fff; }
+
+#docArea{flex:1; overflow:auto; background:#e7ebf2; padding:28px 0 60px;}
+.page{
+  width:794px; min-height:1123px; margin:0 auto 24px; background:#fff; box-shadow:0 2px 14px rgba(20,30,60,.14);
+  display:flex; flex-direction:column; font-family:var(--font-doc); color:#1a1a1a; position:relative;
+}
+
+/* ---------- Rulers ---------- */
+#rulerRow{flex:0 0 auto; height:20px; display:flex; background:#eef1f5; border-bottom:1px solid var(--line); position:relative; z-index:5;}
+#rulerCorner{width:20px; flex:0 0 auto; background:#e4e8f0; border-right:1px solid var(--line); position:relative;}
+#btnToggleRuler{
+  position:absolute; inset:0; width:100%; height:100%; border:none; background:transparent; cursor:pointer;
+  font-size:10px; opacity:.55; display:flex; align-items:center; justify-content:center; padding:0;
+}
+#btnToggleRuler:hover{opacity:1;}
+#hRulerViewport{flex:1; position:relative; overflow:hidden;}
+#hRuler{position:absolute; top:0; height:100%; background:#fff; box-shadow:0 0 0 1px var(--line) inset;}
+#bodyRow{flex:1; display:flex; min-width:0; min-height:0;}
+#vRulerViewport{width:20px; flex:0 0 auto; position:relative; overflow:hidden; background:#eef1f5; border-right:1px solid var(--line);}
+#vRuler{position:absolute; left:0; width:100%; background:#fff; box-shadow:0 0 0 1px var(--line) inset;}
+.ruler-margin{position:absolute; background:#dde3ee;}
+#hRuler .ruler-margin{top:0; bottom:0;}
+#vRuler .ruler-margin{left:0; right:0;}
+.ruler-tick{position:absolute; background:#9aa6ba;}
+.ruler-tick.major{background:#5c6a82;}
+#hRuler .ruler-tick{bottom:0; width:1px;}
+#vRuler .ruler-tick{right:0; height:1px;}
+.ruler-label{position:absolute; font-size:9px; line-height:1; color:#5c6a82; font-family:var(--font-ui); user-select:none; pointer-events:none;}
+#hRuler .ruler-label{top:2px; transform:translateX(-50%);}
+#vRuler .ruler-label{left:50%; transform:translate(-50%,-50%);}
+.ruler-handle{position:absolute; z-index:6; transition:filter .1s, opacity .1s; opacity:.85;}
+.ruler-handle.h{
+  bottom:0; width:0; height:0; cursor:ew-resize;
+  border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:14px solid var(--accent);
+  transform:translateX(-6px);
+}
+.ruler-handle.v{
+  right:0; width:0; height:0; cursor:ns-resize;
+  border-top:6px solid transparent; border-bottom:6px solid transparent; border-right:14px solid var(--accent);
+  transform:translateY(-6px);
+}
+.ruler-handle:hover, .ruler-handle.dragging{ opacity:1; filter:brightness(.85); }
+#app.no-ruler #rulerRow, #app.no-ruler #vRulerViewport{display:none;}
+.page-body{
+  flex:1; padding:60px 55px; font-size:14px; line-height:1.6; outline:none; position:relative;
+}
+.page-body blockquote{border-left:3px solid #b9c6dc; margin:10px 0; padding:4px 14px; color:#48566e; font-style:italic;}
+.page-body pre{background:#f2f4f8; padding:10px 12px; border-radius:6px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; overflow:auto;}
+.page-body hr{border:none; border-top:1px solid #c7cfdc; margin:16px 0;}
+.page-body table{border-collapse:collapse; margin:10px 0;}
+.page-body table td, .page-body table th{border:1px solid #999; padding:6px 9px; font-size:13px;}
+.page-body img{max-width:100%;}
+.page-break{
+  display:block; height:0; border-top:2px dashed #9fb0c9; margin:20px 0; position:relative; page-break-after:always;
+}
+.page-break::after{content:"Page Break"; position:absolute; top:-9px; left:10px; background:#fff; color:#8393ad; font-size:10px; padding:0 6px; font-family:var(--font-ui);}
+
+/* Merge field chip */
+.mf-chip{
+  display:inline-flex; align-items:center; gap:4px; background:var(--chip); border:1px solid var(--chip-border);
+  color:#1e3a6e; border-radius:14px; padding:1px 6px 1px 9px; font-size:12.5px; font-weight:600; font-family:var(--font-ui);
+  vertical-align:baseline; cursor:grab; line-height:1.7; white-space:nowrap;
+}
+.mf-chip .chip-del{border:none; background:transparent; cursor:pointer; color:#3a5590; font-size:13px; padding:0 3px; border-radius:50%; line-height:1;}
+.mf-chip .chip-del:hover{background:rgba(0,0,0,.12);}
+.mf-chip.locked{background:#eef1f6; border-color:#c7ced9; color:#4a5568; cursor:default;}
+.mf-chip.locked .chip-del{display:none;}
+.mf-chip.mf-chip-missing{background:var(--danger-bg); border-color:#f0b6b6; color:#8a2323;}
+.mf-chip.selected{outline:2px solid var(--accent); outline-offset:1px;}
+
+.merged-value{font-weight:inherit;}
+.merged-missing{color:var(--danger); background:var(--danger-bg); border-radius:4px; padding:0 3px;}
+
+.textbox{
+  position:absolute; border:1px dashed #9fb0c9; padding:6px 8px; min-width:80px; min-height:30px; background:rgba(255,255,255,.5);
+  cursor:move; outline:none;
+}
+.shape-rect{position:absolute; border:2px solid #33415c; background:rgba(47,111,237,.06); cursor:move;}
+.shape-circle{position:absolute; border:2px solid #33415c; border-radius:50%; background:rgba(47,111,237,.06); cursor:move;}
+
+/* ---------- Preview panel ---------- */
+#previewPanel{
+  width:380px; min-width:280px; background:#fff; border-left:1px solid var(--line); display:flex; flex-direction:column; overflow:hidden;
+}
+#previewPanel .pv-head{padding:10px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+#previewPanel .pv-head h3{margin:0; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);}
+#previewFrame{flex:1; overflow:auto; background:#e7ebf2; padding:16px;}
+#previewFrame .page{width:auto; min-height:0; transform-origin:top left; box-shadow:0 2px 10px rgba(20,30,60,.14);}
+#debugPanel{display:none; padding:12px; font-size:12px; white-space:pre-wrap; word-break:break-word; background:#0f1c2e; color:#bcd4ff; font-family:ui-monospace,Consolas,monospace; flex:1; overflow:auto;}
+
+/* ---------- Drag-to-resize splitters ---------- */
+.resizer{
+  flex:0 0 auto; width:10px; margin:0 -5px; position:relative; z-index:30;
+  cursor:col-resize; background:transparent; touch-action:none;
+}
+.resizer::before{
+  content:''; position:absolute; top:0; bottom:0; left:50%; width:1px;
+  background:var(--line); transform:translateX(-50%); transition:background .15s;
+}
+.resizer:hover::before, .resizer.dragging::before{ background:var(--danger); width:2px; }
+.resizer .grip{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:20px; height:46px; border-radius:11px; background:#fff;
+  border:2px solid var(--danger); box-shadow:0 2px 8px rgba(20,30,60,.18);
+  display:flex; align-items:center; justify-content:center; gap:3px;
+  pointer-events:none; transition:transform .15s, box-shadow .15s;
+}
+.resizer:hover .grip, .resizer.dragging .grip{ box-shadow:0 4px 12px rgba(214,69,69,.35); }
+.resizer.dragging .grip{ transform:translate(-50%,-50%) scale(1.06); }
+.resizer .grip i{ width:2.5px; height:18px; border-radius:2px; background:var(--danger); display:block; }
+#app.resizing{ cursor:col-resize !important; }
+#app.resizing *{ user-select:none !important; }
+@media (max-width:900px){ .resizer{display:none;} }
+
+/* ---------- Modal ---------- */
+.modal-backdrop{position:fixed; inset:0; background:rgba(15,22,36,.5); display:none; align-items:center; justify-content:center; z-index:200;}
+.modal-backdrop.show{display:flex;}
+.modal{background:#fff; border-radius:12px; padding:20px 22px; width:380px; max-width:92vw; box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal h4{margin:0 0 14px; font-size:15px;}
+.modal .row{margin-bottom:12px; display:flex; flex-direction:column; gap:5px;}
+.modal .row label{font-size:12.5px; font-weight:600; color:var(--muted);}
+.modal .row2{display:flex; gap:10px;}
+.modal .row2 .row{flex:1;}
+.modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:16px;}
+.btn.dark{background:var(--navy); color:#fff; border-color:var(--navy);}
+
+#toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--navy); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; z-index:300; opacity:0; pointer-events:none; transition:.25s;}
+#toast.show{opacity:1;}
+
+#progressWrap{position:fixed; inset:0; background:rgba(15,22,36,.55); display:none; align-items:center; justify-content:center; z-index:400; flex-direction:column; color:#fff; font-size:14px;}
+#progressWrap.show{display:flex;}
+.pbar{width:280px; height:8px; background:rgba(255,255,255,.2); border-radius:5px; overflow:hidden; margin-top:12px;}
+.pbar > div{height:100%; width:0%; background:var(--accent); transition:width .15s;}
+
+#app.fullscreen-editor #sidebar, #app.fullscreen-editor #previewPanel{display:none;}
+#app.fullscreen-editor #center{position:fixed; inset:0; z-index:150; background:var(--paper);}
+#sourceCodeBackdrop{position:fixed; inset:0; background:rgba(15,22,36,.5); display:none; align-items:center; justify-content:center; z-index:250;}
+#sourceCodeBackdrop.show{display:flex;}
+#sourceCodeBackdrop .modal{width:640px; max-width:92vw;}
+#sourceCodeArea{width:100%; height:360px; font-family:ui-monospace,Consolas,monospace; font-size:12px; padding:10px; border:1px solid var(--line); border-radius:8px; resize:vertical;}
+
+@media print{
+  #topbar,#sidebar,#editorToolbar,#previewPanel,#rulerRow,#vRulerViewport,.resizer{display:none !important;}
+  #docArea{overflow:visible; background:#fff; padding:0;}
+  body{overflow:visible;}
+  .page{box-shadow:none; margin:0; page-break-after:always;}
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="brand">Mail Merge <span>Template Designer</span></div>
+
+  <div class="tb-group">
+    <button class="btn primary" id="btnUpload">📂 Upload Excel / CSV</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <select id="sheetSelect" style="display:none;"></select>
+  </div>
+
+  <div class="tb-group record-nav" id="recordNavGroup" style="display:none;">
+    <button class="btn sm" id="btnPrev">◀</button>
+    <span class="record-pill">Record</span>
+    <input type="number" id="recordJump" min="1" value="1">
+    <span class="record-pill" id="recordTotal">/ 0</span>
+    <button class="btn sm" id="btnNext">▶</button>
+  </div>
+
+  <div class="tb-group">
+    <button class="btn ghost sm" id="btnSaveTpl">💾 Save Template</button>
+    <button class="btn ghost sm" id="btnLoadTpl">📁 Load Template</button>
+    <input type="file" id="tplFileInput" accept=".json" style="display:none;">
+  </div>
+
+  <div class="tb-group">
+    <button class="btn ghost sm" id="btnPrintAll">🖨️ Print / Save PDF</button>
+    <button class="btn primary sm" id="btnDownloadPdf">⬇️ Download PDF</button>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="sb-head">
+      <h3>Merge Fields</h3>
+      <input type="text" id="fieldSearch" placeholder="Search fields…">
+    </div>
+    <div id="missingBanner"></div>
+    <div id="fieldList"><div class="sb-empty">Upload an Excel or CSV file to detect merge fields automatically.</div></div>
+    <div class="sb-foot">Drag a field into the document, or double-click to insert at the cursor.</div>
+  </div>
+
+  <div class="resizer" id="resizerSidebar" title="Drag to resize (double-click to reset)"><div class="grip"><i></i><i></i></div></div>
+
+  <div id="center">
+    <div id="editorToolbar"></div>
+
+    <div id="rulerRow">
+      <div id="rulerCorner"><button id="btnToggleRuler" title="Hide rulers">📏</button></div>
+      <div id="hRulerViewport"><div id="hRuler"></div></div>
+    </div>
+
+    <div id="bodyRow">
+      <div id="vRulerViewport"><div id="vRuler"></div></div>
+      <div id="docArea">
+        <div class="page" id="pageTemplate">
+          <textarea id="pageBody">&lt;p&gt;Dear &lt;br&gt;&lt;/p&gt;</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="resizer" id="resizerPreview" title="Drag to resize · double-click for full width"><div class="grip"><i></i><i></i></div></div>
+
+  <div id="previewPanel">
+    <div class="pv-head">
+      <h3>Live Preview</h3>
+      <span id="pvRecordLabel" style="font-size:11.5px;color:var(--muted);">No data</span>
+    </div>
+    <div id="previewFrame"><div class="sb-empty">Upload data to see a live merged preview here.</div></div>
+    <div id="debugPanel"></div>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="modal-backdrop" id="modalMargins">
+  <div class="modal">
+    <h4>Page Margins (px)</h4>
+    <div class="row2">
+      <div class="row"><label>Top/Bottom</label><input type="number" id="marginTB" value="60"></div>
+      <div class="row"><label>Left/Right</label><input type="number" id="marginLR" value="55"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost sm" data-close="modalMargins">Cancel</button>
+      <button class="btn primary sm" id="marginApplyBtn">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalQR">
+  <div class="modal">
+    <h4 id="qrModalTitle">Insert QR Code</h4>
+    <div class="row">
+      <label>Data source</label>
+      <select id="qrSourceType"><option value="field">Merge field (per-record)</option><option value="text">Fixed text</option></select>
+    </div>
+    <div class="row" id="qrFieldRow"><label>Field</label><select id="qrFieldSelect"></select></div>
+    <div class="row" id="qrTextRow" style="display:none;"><label>Text / URL</label><input type="text" id="qrTextValue" placeholder="Enter fixed value"></div>
+    <div class="modal-actions">
+      <button class="btn ghost sm" data-close="modalQR">Cancel</button>
+      <button class="btn primary sm" id="qrInsertBtn">Insert</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalMissingConfirm">
+  <div class="modal">
+    <h4>⚠️ Missing Fields</h4>
+    <div id="missingConfirmBody" style="font-size:13px;line-height:1.6;"></div>
+    <div class="modal-actions">
+      <button class="btn primary sm" data-close="modalMissingConfirm">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="progressWrap"><div id="progressLabel">Working…</div><div class="pbar"><div id="progressBar"></div></div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ======================= STATE ======================= */
+const state = {
+  sheetNames: [],
+  sheets: {},          // {name:{headers,rows}}
+  activeSheet: null,
+  headers: [],
+  rows: [],
+  mergeFields: [],      // [{name, pinned, hidden}]
+  currentRecord: 0,
+  savedRange: null,
+  debugMode: false,
+  headerVisible: false,
+  footerVisible: false
+};
+
+const $ = (sel, root) => (root||document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
+let tinymceEditor = null;
+const editorPage = () => $('#pageTemplate');
+const editorBody = () => tinymceEditor ? tinymceEditor.getBody() : null;
+const editorDoc = () => tinymceEditor ? tinymceEditor.getDoc() : document;
+
+/* ======================= PANEL RESIZERS ======================= */
+(function initResizers(){
+  const app = $('#app');
+  const sidebar = $('#sidebar');
+  const previewPanel = $('#previewPanel');
+  const resizerSidebar = $('#resizerSidebar');
+  const resizerPreview = $('#resizerPreview');
+
+  const SIDEBAR_MIN = 220, SIDEBAR_MAX = 480;
+  const PREVIEW_MIN = 280;
+  const GAP = 120; // min space reserved for the editor when preview grows
+
+  function previewMax(){
+    return Math.max(PREVIEW_MIN, app.clientWidth - sidebar.getBoundingClientRect().width - GAP);
+  }
+
+  function loadSaved(){
+    try{
+      const sw = parseInt(localStorage.getItem('mm_sidebarWidth'), 10);
+      const pw = parseInt(localStorage.getItem('mm_previewWidth'), 10);
+      if(sw) sidebar.style.width = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, sw)) + 'px';
+      if(pw) previewPanel.style.width = Math.min(previewMax(), Math.max(PREVIEW_MIN, pw)) + 'px';
+    }catch(e){}
+  }
+
+  function dragHandle(handle, {getWidth, setWidth, min, max, invert, storeKey}){
+    let startX = 0, startWidth = 0, dragging = false;
+
+    function onMove(e){
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      let dx = x - startX;
+      if(invert) dx = -dx;
+      let w = startWidth + dx;
+      const hi = typeof max === 'function' ? max() : max;
+      w = Math.max(min, Math.min(hi, w));
+      setWidth(w);
+    }
+    function onUp(){
+      if(!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      app.classList.remove('resizing');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+      try{ localStorage.setItem(storeKey, String(getWidth())); }catch(e){}
+    }
+    function onDown(e){
+      e.preventDefault();
+      dragging = true;
+      startX = e.touches ? e.touches[0].clientX : e.clientX;
+      startWidth = getWidth();
+      handle.classList.add('dragging');
+      app.classList.add('resizing');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      document.addEventListener('touchmove', onMove, {passive:false});
+      document.addEventListener('touchend', onUp);
+    }
+    handle.addEventListener('mousedown', onDown);
+    handle.addEventListener('touchstart', onDown, {passive:false});
+  }
+
+  dragHandle(resizerSidebar, {
+    getWidth: ()=> sidebar.getBoundingClientRect().width,
+    setWidth: (w)=>{ sidebar.style.width = w + 'px'; },
+    min: SIDEBAR_MIN, max: SIDEBAR_MAX, invert: false,
+    storeKey: 'mm_sidebarWidth'
+  });
+
+  dragHandle(resizerPreview, {
+    getWidth: ()=> previewPanel.getBoundingClientRect().width,
+    setWidth: (w)=>{ previewPanel.style.width = w + 'px'; },
+    min: PREVIEW_MIN, max: previewMax, invert: true,
+    storeKey: 'mm_previewWidth'
+  });
+
+  // Double-click the preview handle to snap to full width / restore
+  let previewSavedWidth = null;
+  resizerPreview.addEventListener('dblclick', ()=>{
+    const current = previewPanel.getBoundingClientRect().width;
+    const full = previewMax();
+    if(previewSavedWidth === null || current < full - 4){
+      previewSavedWidth = current;
+      previewPanel.style.width = full + 'px';
+    } else {
+      previewPanel.style.width = previewSavedWidth + 'px';
+      previewSavedWidth = null;
+    }
+    try{ localStorage.setItem('mm_previewWidth', String(previewPanel.getBoundingClientRect().width)); }catch(e){}
+  });
+
+  // Double-click the sidebar handle to reset to default width
+  resizerSidebar.addEventListener('dblclick', ()=>{
+    sidebar.style.width = '270px';
+    try{ localStorage.setItem('mm_sidebarWidth', '270'); }catch(e){}
+  });
+
+  window.addEventListener('resize', ()=>{
+    const pw = previewPanel.getBoundingClientRect().width;
+    const hi = previewMax();
+    if(pw > hi) previewPanel.style.width = hi + 'px';
+  });
+
+  loadSaved();
+})();
+
+/* ======================= RULERS ======================= */
+const Rulers = (function initRulers(){
+  const PPI = 96; // css px per inch (matches the 794x1123 A4 page)
+  const app = document.getElementById('app');
+  const docArea = document.getElementById('docArea');
+  const hViewport = document.getElementById('hRulerViewport');
+  const vViewport = document.getElementById('vRulerViewport');
+  const hRuler = document.getElementById('hRuler');
+  const vRuler = document.getElementById('vRuler');
+  const btnToggle = document.getElementById('btnToggleRuler');
+  const MIN_GAP = 40; // smallest allowed printable width/height while dragging
+
+  function getPage(){ return document.getElementById('pageTemplate'); }
+
+  function getMargins(){
+    const body = (typeof editorBody === 'function') ? editorBody() : null;
+    if(body){
+      const cs = getComputedStyle(body);
+      const num = (v, dflt) => { const n = parseFloat(v); return isNaN(n) ? dflt : n; };
+      return {
+        top: num(cs.paddingTop, 60), right: num(cs.paddingRight, 55),
+        bottom: num(cs.paddingBottom, 60), left: num(cs.paddingLeft, 55)
+      };
+    }
+    return {top:60, right:55, bottom:60, left:55};
+  }
+
+  function setMargin(side, px){
+    const body = (typeof editorBody === 'function') ? editorBody() : null;
+    if(!body) return;
+    const prop = 'padding' + side.charAt(0).toUpperCase() + side.slice(1);
+    body.style[prop] = Math.max(0, Math.round(px)) + 'px';
+  }
+
+  function buildTicks(container, lengthPx, orientation){
+    container.querySelectorAll('.ruler-tick,.ruler-label').forEach(n=>n.remove());
+    const frag = document.createDocumentFragment();
+    const stepMinor = PPI/8; // eighth-inch minor ticks
+    for(let px=0; px<=lengthPx+0.5; px += stepMinor){
+      const eighth = Math.round(px/stepMinor);
+      const isMajor = eighth % 8 === 0;
+      const isHalf = eighth % 4 === 0;
+      const tick = document.createElement('div');
+      tick.className = 'ruler-tick' + (isMajor?' major':'');
+      if(orientation==='h'){
+        tick.style.left = Math.round(px)+'px';
+        tick.style.height = isMajor ? '100%' : (isHalf ? '55%':'32%');
+      } else {
+        tick.style.top = Math.round(px)+'px';
+        tick.style.width = isMajor ? '100%' : (isHalf ? '55%':'32%');
+      }
+      frag.appendChild(tick);
+      if(isMajor && px > 0.5){
+        const label = document.createElement('div');
+        label.className = 'ruler-label';
+        label.textContent = String(eighth/8);
+        if(orientation==='h'){ label.style.left = Math.round(px)+'px'; }
+        else { label.style.top = Math.round(px)+'px'; }
+        frag.appendChild(label);
+      }
+    }
+    container.appendChild(frag);
+  }
+
+  /* ---- draggable margin handles ---- */
+  const handles = {};
+  function makeHandle(orientation, side){
+    const h = document.createElement('div');
+    h.className = 'ruler-handle ' + (orientation==='h' ? 'h' : 'v');
+    h.title = side.charAt(0).toUpperCase()+side.slice(1)+' margin — drag to adjust';
+    (orientation==='h' ? hRuler : vRuler).appendChild(h);
+    handles[side] = h;
+    let dragging = false;
+    h.addEventListener('mousedown', (e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const page = getPage(); if(!page) return;
+      const pageSize = orientation==='h' ? page.offsetWidth : page.offsetHeight;
+      const m = getMargins();
+      const oppositeSide = {left:'right', right:'left', top:'bottom', bottom:'top'}[side];
+      const oppositeVal = m[oppositeSide];
+      const startClient = orientation==='h' ? e.clientX : e.clientY;
+      const startVal = m[side];
+      dragging = true;
+      h.classList.add('dragging');
+      document.body.style.cursor = orientation==='h' ? 'ew-resize' : 'ns-resize';
+      function onMove(ev){
+        const cur = orientation==='h' ? ev.clientX : ev.clientY;
+        let dx = cur - startClient;
+        if(side==='right' || side==='bottom') dx = -dx;
+        let val = startVal + dx;
+        val = Math.max(0, Math.min(pageSize - oppositeVal - MIN_GAP, val));
+        setMargin(side, val);
+        drawMargins();
+        scheduleUpdate();
+      }
+      function onUp(){
+        dragging = false;
+        h.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+  makeHandle('h','left'); makeHandle('h','right');
+  makeHandle('v','top');  makeHandle('v','bottom');
+
+  function drawMargins(){
+    hRuler.querySelectorAll('.ruler-margin').forEach(n=>n.remove());
+    vRuler.querySelectorAll('.ruler-margin').forEach(n=>n.remove());
+    const page = getPage();
+    if(!page) return;
+    const m = getMargins();
+    const w = page.offsetWidth, h = page.offsetHeight;
+
+    const hm1 = document.createElement('div'); hm1.className='ruler-margin';
+    hm1.style.left = '0'; hm1.style.width = Math.max(0,m.left)+'px';
+    const hm2 = document.createElement('div'); hm2.className='ruler-margin';
+    hm2.style.left = Math.max(0,w-m.right)+'px'; hm2.style.width = Math.max(0,m.right)+'px';
+    hRuler.insertBefore(hm1, hRuler.firstChild); hRuler.insertBefore(hm2, hRuler.firstChild);
+
+    const vm1 = document.createElement('div'); vm1.className='ruler-margin';
+    vm1.style.top = '0'; vm1.style.height = Math.max(0,m.top)+'px';
+    const vm2 = document.createElement('div'); vm2.className='ruler-margin';
+    vm2.style.top = Math.max(0,h-m.bottom)+'px'; vm2.style.height = Math.max(0,m.bottom)+'px';
+    vRuler.insertBefore(vm1, vRuler.firstChild); vRuler.insertBefore(vm2, vRuler.firstChild);
+
+    handles.left.style.left = Math.round(m.left)+'px';
+    handles.right.style.left = Math.round(w-m.right)+'px';
+    handles.top.style.top = Math.round(m.top)+'px';
+    handles.bottom.style.top = Math.round(h-m.bottom)+'px';
+  }
+
+  function reposition(){
+    const page = getPage();
+    if(!page || app.classList.contains('no-ruler')) return;
+    const pageRect = page.getBoundingClientRect();
+    const hvRect = hViewport.getBoundingClientRect();
+    const vvRect = vViewport.getBoundingClientRect();
+    hRuler.style.left = Math.round(pageRect.left - hvRect.left) + 'px';
+    vRuler.style.top = Math.round(pageRect.top - vvRect.top) + 'px';
+  }
+
+  function rebuild(){
+    const page = getPage();
+    if(!page || app.classList.contains('no-ruler')) return;
+    const w = page.offsetWidth, h = page.offsetHeight;
+    if(w < 10 || h < 10) return;
+    hRuler.style.width = w+'px';
+    vRuler.style.height = h+'px';
+    buildTicks(hRuler, w, 'h');
+    buildTicks(vRuler, h, 'v');
+    drawMargins();
+    reposition();
+  }
+
+  docArea.addEventListener('scroll', reposition, {passive:true});
+  window.addEventListener('resize', reposition);
+
+  if(window.ResizeObserver){
+    new ResizeObserver(()=> rebuild()).observe(docArea);
+    const page = getPage();
+    if(page) new ResizeObserver(()=> rebuild()).observe(page);
+  }
+
+  btnToggle.addEventListener('click', ()=>{
+    app.classList.toggle('no-ruler');
+    const hidden = app.classList.contains('no-ruler');
+    btnToggle.title = hidden ? 'Show rulers' : 'Hide rulers';
+    try{ localStorage.setItem('mm_rulerHidden', hidden ? '1' : '0'); }catch(e){}
+    if(!hidden) requestAnimationFrame(rebuild);
+  });
+  try{
+    if(localStorage.getItem('mm_rulerHidden') === '1'){
+      app.classList.add('no-ruler');
+      btnToggle.title = 'Show rulers';
+    }
+  }catch(e){}
+
+  requestAnimationFrame(rebuild);
+
+  return { rebuild, reposition };
+})();
+
+function toast(msg, ms){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), ms||2200);
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function showModal(id){ $('#'+id).classList.add('show'); }
+function hideModal(id){ $('#'+id).classList.remove('show'); }
+$$('[data-close]').forEach(b=>b.addEventListener('click', ()=>hideModal(b.dataset.close)));
+$$('.modal-backdrop').forEach(m=>m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('show'); }));
+
+function showProgress(label){
+  $('#progressWrap').classList.add('show');
+  $('#progressLabel').textContent = label || 'Working…';
+  $('#progressBar').style.width = '0%';
+}
+function setProgress(pct, label){
+  $('#progressBar').style.width = Math.min(100,pct) + '%';
+  if(label) $('#progressLabel').textContent = label;
+}
+function hideProgress(){ $('#progressWrap').classList.remove('show'); }
+
+/* ======================= WEB WORKER: EXCEL PARSE ======================= */
+const workerSrc = `
+importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+self.onmessage = function(e){
+  const buffer = e.data.buffer;
+  try{
+    const wb = XLSX.read(buffer, {type:'array', cellDates:true});
+    const sheets = {};
+    wb.SheetNames.forEach(function(sn){
+      const ws = wb.Sheets[sn];
+      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+      if(!aoa.length){ sheets[sn] = {headers:[], rows:[]}; return; }
+      const headerRow = aoa[0];
+      const validCols = [];
+      headerRow.forEach(function(h,i){ if(h !== undefined && String(h).trim() !== '') validCols.push(i); });
+      const headers = validCols.map(function(i){ return String(headerRow[i]).trim(); });
+      const rows = [];
+      for(let r=1;r<aoa.length;r++){
+        const rowArr = aoa[r];
+        if(!rowArr || rowArr.every(function(c){ return c===undefined || String(c).trim()===''; })) continue;
+        const obj = {};
+        validCols.forEach(function(ci, idx){ obj[headers[idx]] = rowArr[ci] !== undefined ? rowArr[ci] : ''; });
+        rows.push(obj);
+      }
+      sheets[sn] = {headers: headers, rows: rows};
+    });
+    self.postMessage({ok:true, sheetNames: wb.SheetNames, sheets: sheets});
+  }catch(err){
+    self.postMessage({ok:false, error: err.message});
+  }
+};
+`;
+let excelWorker = null;
+function getWorker(){
+  if(excelWorker) return excelWorker;
+  const blob = new Blob([workerSrc], {type:'application/javascript'});
+  excelWorker = new Worker(URL.createObjectURL(blob));
+  return excelWorker;
+}
+
+/* ======================= FILE UPLOAD ======================= */
+$('#btnUpload').addEventListener('click', ()=> $('#fileInput').click());
+$('#fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  showProgress('Reading file…');
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const buffer = ev.target.result;
+    const worker = getWorker();
+    worker.onmessage = function(msg){
+      hideProgress();
+      const data = msg.data;
+      if(!data.ok){ toast('Failed to parse file: ' + data.error, 4000); return; }
+      state.sheetNames = data.sheetNames;
+      state.sheets = data.sheets;
+      populateSheetSelect();
+      loadSheet(data.sheetNames[0]);
+      toast('Loaded "' + file.name + '" — ' + data.sheetNames.length + ' sheet(s) detected.');
+    };
+    setProgress(40, 'Parsing workbook…');
+    worker.postMessage({buffer: buffer}, [buffer]);
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+function populateSheetSelect(){
+  const sel = $('#sheetSelect');
+  sel.innerHTML = '';
+  state.sheetNames.forEach(sn=>{
+    const opt = document.createElement('option');
+    opt.value = sn; opt.textContent = sn;
+    sel.appendChild(opt);
+  });
+  sel.style.display = state.sheetNames.length > 1 ? 'inline-block' : 'none';
+}
+$('#sheetSelect').addEventListener('change', e=> loadSheet(e.target.value));
+
+function loadSheet(name){
+  const sheet = state.sheets[name];
+  if(!sheet){ toast('Sheet not found.'); return; }
+  state.activeSheet = name;
+  const oldFieldNames = state.mergeFields.map(f=>f.name);
+  const removed = oldFieldNames.filter(n => !sheet.headers.includes(n));
+  const isReupload = oldFieldNames.length > 0;
+
+  state.headers = sheet.headers;
+  state.rows = sheet.rows;
+  state.mergeFields = sheet.headers.map(h=>{
+    const existing = oldFieldNames.length ? null : null;
+    const prev = (state.mergeFields || []).find(f=>f.name===h);
+    return { name:h, pinned: prev ? prev.pinned : false, hidden: prev ? prev.hidden : false };
+  });
+  state.currentRecord = 0;
+
+  renderFieldList();
+  if(isReupload && removed.length){
+    markMissingChips(removed);
+    showMissingBanner(removed, sheet.headers);
+  } else {
+    hideMissingBanner();
+    clearMissingChips();
+  }
+
+  $('#recordNavGroup').style.display = sheet.rows.length ? 'flex' : 'none';
+  $('#recordTotal').textContent = '/ ' + sheet.rows.length;
+  $('#recordJump').max = sheet.rows.length;
+  $('#recordJump').value = sheet.rows.length ? 1 : '';
+  updatePreview();
+}
+
+/* ======================= MERGE FIELDS PANEL ======================= */
+function iconFor(name){
+  const n = name.toLowerCase();
+  if(/name/.test(n)) return '👤';
+  if(/mail/.test(n)) return '📧';
+  if(/phone|mobile|contact/.test(n)) return '📞';
+  if(/address/.test(n)) return '📍';
+  if(/amount|fee|price|total|₹|rs\.?$/.test(n)) return '💰';
+  if(/date/.test(n)) return '📅';
+  if(/invoice|no\.?$|number|reg/.test(n)) return '🧾';
+  if(/dept|department/.test(n)) return '🏢';
+  return '🔖';
+}
+
+function renderFieldList(){
+  const listEl = $('#fieldList');
+  const q = ($('#fieldSearch').value || '').toLowerCase();
+  listEl.innerHTML = '';
+  if(!state.mergeFields.length){
+    listEl.innerHTML = '<div class="sb-empty">Upload an Excel or CSV file to detect merge fields automatically.</div>';
+    return;
+  }
+  const visible = state.mergeFields.filter(f => !f.hidden && f.name.toLowerCase().includes(q));
+  const sorted = [...visible].sort((a,b)=> (b.pinned - a.pinned) || a.name.localeCompare(b.name));
+  if(!sorted.length){
+    listEl.innerHTML = '<div class="sb-empty">No fields match your search.</div>';
+    return;
+  }
+  sorted.forEach(f=>{
+    const item = document.createElement('div');
+    item.className = 'mf-item' + (f.pinned ? ' pinned' : '');
+    item.draggable = true;
+    item.title = 'Excel column: ' + f.name;
+    item.innerHTML =
+      '<span class="mfi-ico">'+iconFor(f.name)+'</span>' +
+      '<span class="mfi-name">'+escapeHtml(f.name)+'</span>' +
+      '<span class="mfi-actions">' +
+        '<button data-act="pin" title="Pin / Favorite">'+(f.pinned?'★':'☆')+'</button>' +
+        '<button data-act="copy" title="Copy placeholder">⧉</button>' +
+        '<button data-act="hide" title="Remove from panel">✕</button>' +
+      '</span>';
+    item.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/x-mergefield', f.name);
+      e.dataTransfer.setData('text/plain', '['+f.name+']');
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    item.addEventListener('dblclick', ()=> insertFieldAtSavedRange(f.name));
+    item.querySelector('[data-act="pin"]').addEventListener('click', e=>{
+      e.stopPropagation(); f.pinned = !f.pinned; renderFieldList();
+    });
+    item.querySelector('[data-act="copy"]').addEventListener('click', e=>{
+      e.stopPropagation();
+      navigator.clipboard && navigator.clipboard.writeText('{{'+f.name+'}}').then(()=> toast('Copied {{'+f.name+'}} to clipboard.'));
+    });
+    item.querySelector('[data-act="hide"]').addEventListener('click', e=>{
+      e.stopPropagation(); f.hidden = true; renderFieldList();
+      toast('Field hidden from panel. Reload the file to restore it.');
+    });
+    listEl.appendChild(item);
+  });
+}
+$('#fieldSearch').addEventListener('input', renderFieldList);
+
+function showMissingBanner(removed, newHeaders){
+  const el = $('#missingBanner');
+  el.style.display = 'block';
+  el.innerHTML = '<strong>⚠️ '+removed.length+' merge field(s) missing in the new file</strong>' +
+    'These fields are used in the document but no longer exist in the uploaded data. Remap them or they will show as blank when merging.';
+  removed.forEach(name=>{
+    const row = document.createElement('div');
+    row.className = 'remap-row';
+    const opts = ['<option value="">— leave missing —</option>'].concat(
+      newHeaders.map(h=>'<option value="'+escapeHtml(h)+'">'+escapeHtml(h)+'</option>')
+    ).join('');
+    row.innerHTML = '<span style="min-width:110px;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(name)+' →</span><select>'+opts+'</select>';
+    row.querySelector('select').addEventListener('change', e=>{
+      const newName = e.target.value;
+      if(!newName) return;
+      remapField(name, newName);
+      row.remove();
+      if(!el.querySelectorAll('.remap-row').length) hideMissingBanner();
+    });
+    el.appendChild(row);
+  });
+  const body = removed.map(r=>'• '+escapeHtml(r)).join('<br>');
+  $('#missingConfirmBody').innerHTML = 'The following columns from your previous document are not present in this file:<br><br>'+body+'<br><br>Matching fields were preserved automatically. Use the sidebar banner to remap the missing ones.';
+  showModal('modalMissingConfirm');
+}
+function hideMissingBanner(){ $('#missingBanner').style.display = 'none'; $('#missingBanner').innerHTML=''; }
+
+function markMissingChips(removedNames){
+  $$('.mf-chip', editorDoc()).forEach(chip=>{
+    if(removedNames.includes(chip.dataset.field)) chip.classList.add('mf-chip-missing');
+  });
+}
+function clearMissingChips(){
+  $$('.mf-chip', editorDoc()).forEach(chip=> chip.classList.remove('mf-chip-missing'));
+}
+function remapField(oldName, newName){
+  $$('.mf-chip', editorDoc()).forEach(chip=>{
+    if(chip.dataset.field === oldName){
+      chip.dataset.field = newName;
+      chip.classList.remove('mf-chip-missing');
+      const lbl = chip.querySelector('.chip-label');
+      if(lbl) lbl.textContent = newName;
+    }
+  });
+  updatePreview();
+  toast('Remapped "'+oldName+'" → "'+newName+'".');
+}
+
+/* ======================= EDITOR: SELECTION TRACKING ======================= */
+/* TinyMCE tracks its own selection inside the iframe; we mirror it into
+   state.savedRange (a Range that lives in the iframe's document) whenever
+   the cursor moves, so sidebar actions (double-click / drag insert) know
+   where to insert. */
+function saveSelectionFromEditor(){
+  if(!tinymceEditor) return;
+  const rng = tinymceEditor.selection.getRng();
+  if(rng) state.savedRange = rng.cloneRange();
+}
+
+/* ======================= MERGE FIELD CHIP INSERTION ======================= */
+function createChipNode(name){
+  const doc = editorDoc();
+  const span = doc.createElement('span');
+  span.className = 'mf-chip';
+  span.contentEditable = 'false';
+  span.draggable = true;
+  span.dataset.field = name;
+  span.innerHTML = '<span class="chip-ico">🔗</span><span class="chip-label">'+escapeHtml(name)+'</span><button class="chip-del" title="Remove field" contenteditable="false">×</button>';
+  span.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/x-move-chip', '1');
+    e.dataTransfer.setData('text/x-mergefield', name);
+    span._dragSelf = true;
+  });
+  span.querySelector('.chip-del').addEventListener('click', e=>{
+    e.stopPropagation();
+    if(span.classList.contains('locked')) return;
+    span.remove();
+    scheduleUpdate();
+  });
+  span.addEventListener('click', e=>{
+    if(e.target.classList.contains('chip-del')) return;
+    $$('.mf-chip.selected', doc).forEach(c=> c!==span && c.classList.remove('selected'));
+    span.classList.toggle('selected');
+  });
+  span.addEventListener('dblclick', ()=> openChipProperties(span));
+  span.addEventListener('contextmenu', e=>{
+    e.preventDefault();
+    span.classList.toggle('locked');
+    toast(span.classList.contains('locked') ? 'Field locked (right-click to unlock).' : 'Field unlocked.');
+  });
+  return span;
+}
+
+function openChipProperties(chip){
+  const rec = state.rows[state.currentRecord] || {};
+  const sample = rec[chip.dataset.field];
+  alert('Field: ' + chip.dataset.field + '\nSample value (current record): ' + (sample !== undefined ? sample : '— not found —') + '\n\nTip: right-click a field to lock/unlock it.');
+}
+
+function insertNodeAtRange(node, range){
+  const doc = range.startContainer.ownerDocument || editorDoc();
+  range.deleteContents();
+  const zwBefore = doc.createTextNode('\u200B');
+  const zwAfter = doc.createTextNode('\u200B');
+  const frag = doc.createDocumentFragment();
+  frag.appendChild(zwBefore); frag.appendChild(node); frag.appendChild(zwAfter);
+  range.insertNode(frag);
+  const newRange = doc.createRange();
+  newRange.setStartAfter(zwAfter);
+  newRange.collapse(true);
+  if(tinymceEditor){ tinymceEditor.selection.setRng(newRange); tinymceEditor.undoManager.add(); }
+  state.savedRange = newRange.cloneRange();
+}
+
+function insertFieldAtSavedRange(name){
+  if(!tinymceEditor) return;
+  const body = editorBody();
+  tinymceEditor.focus();
+  let range = state.savedRange;
+  if(!range || !body.contains(range.startContainer)){
+    range = editorDoc().createRange();
+    range.selectNodeContents(body);
+    range.collapse(false);
+  }
+  insertNodeAtRange(createChipNode(name), range);
+  scheduleUpdate();
+}
+
+function bindDropZone(el){
+  if(el._mmDropBound) return; // prevent duplicate listeners on repeated bindAllDropZones() calls
+  el._mmDropBound = true;
+  const doc = el.ownerDocument;
+  el.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  el.addEventListener('drop', e=>{
+    e.preventDefault();
+    const field = e.dataTransfer.getData('text/x-mergefield');
+    if(!field) return;
+    let range = null;
+    if(doc.caretRangeFromPoint){
+      range = doc.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if(doc.caretPositionFromPoint){
+      const pos = doc.caretPositionFromPoint(e.clientX, e.clientY);
+      if(pos){ range = doc.createRange(); range.setStart(pos.offsetNode, pos.offset); }
+    }
+    if(!range) return;
+    el.focus();
+    if(tinymceEditor && doc === editorDoc()) tinymceEditor.selection.setRng(range);
+    insertNodeAtRange(createChipNode(field), range);
+    scheduleUpdate();
+  });
+}
+function bindAllDropZones(){
+  const body = editorBody();
+  if(body) bindDropZone(body);
+  $$('.textbox', editorDoc()).forEach(bindDropZone);
+}
+
+/* ======================= APP-SPECIFIC EDITOR COMMANDS =======================
+   Bold/italic/align/lists/tables/images/links/undo-redo/find-replace/special
+   characters/source view/fullscreen are now provided natively by the real
+   TinyMCE toolbar+menu below. Only the mail-merge-specific extras stay here,
+   and they insert straight into the live TinyMCE selection. */
+
+function insertHtmlAtCursor(html){
+  if(!tinymceEditor) return;
+  tinymceEditor.focus();
+  if(state.savedRange) tinymceEditor.selection.setRng(state.savedRange);
+  tinymceEditor.selection.setContent(html);
+  tinymceEditor.undoManager.add();
+}
+
+/* Page break */
+function insertPageBreak(){
+  insertHtmlAtCursor('<div class="page-break" contenteditable="false"></div><p><br></p>');
+  scheduleUpdate();
+}
+
+/* Text box */
+function insertTextbox(){
+  const doc = editorDoc();
+  const box = doc.createElement('div');
+  box.className = 'textbox'; box.contentEditable = 'true';
+  box.style.left = '120px'; box.style.top = '120px'; box.style.width='200px'; box.style.height='80px';
+  box.textContent = 'Text box';
+  makeDraggableResizable(box);
+  editorBody().appendChild(box);
+  bindDropZone(box);
+  scheduleUpdate();
+}
+function insertShape(cls){
+  const doc = editorDoc();
+  const shp = doc.createElement('div');
+  shp.className = cls; shp.contentEditable='false';
+  shp.style.left='140px'; shp.style.top='140px'; shp.style.width='120px'; shp.style.height=(cls==='shape-circle'?'120px':'80px');
+  makeDraggableResizable(shp);
+  editorBody().appendChild(shp);
+  scheduleUpdate();
+}
+function makeDraggableResizable(el){
+  const doc = el.ownerDocument;
+  el.style.position = 'absolute';
+  let sx,sy,ox,oy,dragging=false;
+  el.addEventListener('mousedown', e=>{
+    if(e.target !== el) return; // avoid interfering with text editing / resize handle
+    if(el.isContentEditable && doc.activeElement===el) return;
+    dragging = true; sx=e.clientX; sy=e.clientY; ox=el.offsetLeft; oy=el.offsetTop;
+    e.preventDefault();
+  });
+  doc.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    el.style.left = (ox + (e.clientX-sx)) + 'px';
+    el.style.top = (oy + (e.clientY-sy)) + 'px';
+  });
+  doc.addEventListener('mouseup', ()=>{ if(dragging){ dragging=false; scheduleUpdate(); } });
+}
+
+/* QR / Barcode */
+let qrMode = 'qr';
+function openQrModal(){ qrMode='qr'; $('#qrModalTitle').textContent='Insert QR Code'; populateQrFieldSelect(); showModal('modalQR'); }
+function openBarcodeModal(){ qrMode='barcode'; $('#qrModalTitle').textContent='Insert Barcode'; populateQrFieldSelect(); showModal('modalQR'); }
+function populateQrFieldSelect(){
+  const sel = $('#qrFieldSelect');
+  sel.innerHTML = state.headers.map(h=>'<option value="'+escapeHtml(h)+'">'+escapeHtml(h)+'</option>').join('');
+}
+$('#qrSourceType').addEventListener('change', e=>{
+  const isField = e.target.value === 'field';
+  $('#qrFieldRow').style.display = isField ? 'flex' : 'none';
+  $('#qrTextRow').style.display = isField ? 'none' : 'flex';
+});
+$('#qrInsertBtn').addEventListener('click', ()=>{
+  const doc = editorDoc();
+  const isField = $('#qrSourceType').value === 'field';
+  const holder = doc.createElement('span');
+  holder.contentEditable = 'false';
+  holder.className = qrMode === 'qr' ? 'qr-holder' : 'barcode-holder';
+  holder.style.display = 'inline-block';
+  holder.style.verticalAlign = 'middle';
+  if(isField){ holder.dataset.field = $('#qrFieldSelect').value; }
+  else { holder.dataset.text = $('#qrTextValue').value || 'SAMPLE'; }
+  const canvas = doc.createElement('canvas');
+  holder.appendChild(canvas);
+  tinymceEditor.focus();
+  if(state.savedRange) tinymceEditor.selection.setRng(state.savedRange);
+  tinymceEditor.selection.getRng().insertNode(holder);
+  tinymceEditor.undoManager.add();
+  renderCodeHolder(holder);
+  hideModal('modalQR'); scheduleUpdate();
+});
+function renderCodeHolder(holder){
+  const canvas = holder.querySelector('canvas');
+  const rec = state.rows[state.currentRecord] || {};
+  const value = holder.dataset.field ? (rec[holder.dataset.field] !== undefined ? String(rec[holder.dataset.field]) : holder.dataset.field) : holder.dataset.text;
+  if(holder.className === 'qr-holder'){
+    if(window.QRCode) QRCode.toCanvas(canvas, value || ' ', {width:90, margin:1}, ()=>{});
+  } else {
+    try{ if(window.JsBarcode) JsBarcode(canvas, value || '0', {height:40, displayValue:true, fontSize:11, width:1.4}); }catch(err){}
+  }
+}
+function refreshAllCodeHolders(){
+  $$('.qr-holder, .barcode-holder', editorDoc()).forEach(renderCodeHolder);
+}
+
+/* Margins */
+function openMarginsModal(){
+  const body = editorBody();
+  if(body){
+    const cs = getComputedStyle(body);
+    const tb = Math.round(parseFloat(cs.paddingTop)||60);
+    const lr = Math.round(parseFloat(cs.paddingLeft)||55);
+    $('#marginTB').value = tb;
+    $('#marginLR').value = lr;
+  }
+  showModal('modalMargins');
+}
+$('#marginApplyBtn').addEventListener('click', ()=>{
+  const tb = $('#marginTB').value + 'px', lr = $('#marginLR').value + 'px';
+  editorBody().style.padding = tb + ' ' + lr;
+  hideModal('modalMargins'); scheduleUpdate();
+  if(typeof Rulers !== 'undefined') Rulers.rebuild();
+});
+
+/* Undo/redo, clear formatting, paragraph styles, blockquote, horizontal
+   rule, unlink and special-character insertion are now all handled
+   natively by the real TinyMCE toolbar/menu. Table row/column add/delete,
+   find & replace, source-code view and
+   fullscreen are handled natively by TinyMCE's own table/searchreplace/
+   code/fullscreen plugins now — no custom code needed for those. */
+function rebindAllChips(){
+  $$('.mf-chip', editorDoc()).forEach(chip=>{
+    const del = chip.querySelector('.chip-del');
+    if(del) del.addEventListener('click', e=>{ e.stopPropagation(); if(!chip.classList.contains('locked')){ chip.remove(); scheduleUpdate(); } });
+    chip.addEventListener('dblclick', ()=> openChipProperties(chip));
+    chip.addEventListener('contextmenu', e=>{ e.preventDefault(); chip.classList.toggle('locked'); });
+  });
+}
+
+function domToTemplateText(bodyEl){
+  const clone = bodyEl.cloneNode(true);
+  clone.querySelectorAll('.mf-chip').forEach(chip=>{
+    chip.replaceWith(document.createTextNode('{{'+chip.dataset.field+'}}'));
+  });
+  clone.querySelectorAll('.qr-holder,.barcode-holder').forEach(h=>{
+    h.replaceWith(document.createTextNode(h.dataset.field ? '[[QR:'+h.dataset.field+']]' : '[[QR:"'+h.dataset.text+'"]]'));
+  });
+  // Strip tags roughly for a readable text view
+  const tmp = document.createElement('div'); tmp.appendChild(clone);
+  return tmp.innerText || tmp.textContent;
+}
+
+/* ======================= MERGE ENGINE / PREVIEW =======================
+   The real content lives inside the TinyMCE iframe's body. For preview/
+   print/PDF we build a fresh, detached .page/.page-body pair in the main
+   document and copy the (merged) markup into it — independent of the
+   live editor, so it renders correctly in the preview panel, the print
+   window and the PDF export canvas alike. */
+function buildMergedPage(record){
+  const wrap = document.createElement('div');
+  wrap.className = 'page';
+  const body = document.createElement('div');
+  body.className = 'page-body';
+  body.style.padding = editorBody() ? getComputedStyle(editorBody()).padding : '';
+  body.innerHTML = editorBody() ? editorBody().innerHTML : '';
+  wrap.appendChild(body);
+
+  body.querySelectorAll('.mf-chip').forEach(chip=>{
+    const field = chip.dataset.field;
+    const has = record && Object.prototype.hasOwnProperty.call(record, field);
+    const val = has ? record[field] : undefined;
+    const span = document.createElement('span');
+    span.className = 'merged-value' + (has ? '' : ' merged-missing');
+    span.textContent = has ? String(val) : '['+field+']';
+    chip.replaceWith(span);
+  });
+  body.querySelectorAll('.qr-holder, .barcode-holder').forEach(holder=>{
+    const canvas = holder.querySelector('canvas');
+    const value = holder.dataset.field ? (record && record[holder.dataset.field] !== undefined ? String(record[holder.dataset.field]) : '') : holder.dataset.text;
+    if(holder.className.indexOf('qr-holder') > -1){
+      if(window.QRCode) QRCode.toCanvas(canvas, value || ' ', {width:90, margin:1}, ()=>{});
+    } else {
+      try{ if(window.JsBarcode) JsBarcode(canvas, value || '0', {height:40, displayValue:true, fontSize:11, width:1.4}); }catch(err){}
+    }
+  });
+  body.querySelectorAll('[contenteditable]').forEach(n=> n.removeAttribute('contenteditable'));
+  body.querySelectorAll('.chip-del').forEach(n=>n.remove());
+  return wrap;
+}
+
+let updateTimer = null;
+function scheduleUpdate(){
+  clearTimeout(updateTimer);
+  updateTimer = setTimeout(()=>{ refreshAllCodeHolders(); updatePreview(); autosaveLocal(); }, 250);
+}
+
+function rescalePreview(){
+  const frame = $('#previewFrame');
+  const merged = frame.querySelector('.page');
+  if(!merged) return;
+  const scale = Math.max(0.15, Math.min(3, (frame.clientWidth - 32) / 794));
+  merged.style.transform = 'scale(' + scale + ')';
+  merged.style.marginBottom = (1123*(1-scale)*-1) + 'px';
+}
+
+function updatePreview(){
+  const total = state.rows.length;
+  $('#pvRecordLabel').textContent = total ? ('Record ' + (state.currentRecord+1) + ' of ' + total) : 'No data';
+  if(state.debugMode){
+    $('#debugPanel').textContent = editorBody() ? domToTemplateText(editorBody()) : '';
+    return;
+  }
+  const frame = $('#previewFrame');
+  frame.innerHTML = '';
+  const record = state.rows[state.currentRecord];
+  const merged = buildMergedPage(record);
+  frame.appendChild(merged);
+  // scale to fill panel width
+  requestAnimationFrame(rescalePreview);
+}
+
+if(window.ResizeObserver){
+  const previewFrameEl = document.getElementById('previewFrame');
+  if(previewFrameEl){
+    new ResizeObserver(()=> requestAnimationFrame(rescalePreview)).observe(previewFrameEl);
+  }
+}
+
+/* Record navigation */
+$('#btnPrev').addEventListener('click', ()=>{ if(state.currentRecord>0){ state.currentRecord--; syncRecordInputs(); } });
+$('#btnNext').addEventListener('click', ()=>{ if(state.currentRecord < state.rows.length-1){ state.currentRecord++; syncRecordInputs(); } });
+$('#recordJump').addEventListener('change', e=>{
+  let v = parseInt(e.target.value)||1;
+  v = Math.max(1, Math.min(state.rows.length, v));
+  state.currentRecord = v-1;
+  syncRecordInputs();
+});
+function syncRecordInputs(){
+  $('#recordJump').value = state.currentRecord+1;
+  updatePreview();
+}
+
+/* ======================= TEMPLATE SAVE / LOAD ======================= */
+function autosaveLocal(){
+  if(!editorBody()) return;
+  try{ localStorage.setItem('mmtd_autosave', editorBody().innerHTML); }catch(e){}
+}
+/* Older saves may contain a whole "<div class="page-body">…</div>" wrapper
+   (from before the real TinyMCE editor was wired in) — unwrap it either way. */
+function extractBodyHtml(html){
+  const tmp = editorDoc().createElement('div');
+  tmp.innerHTML = html;
+  const wrapper = tmp.firstElementChild;
+  if(wrapper && wrapper.classList && wrapper.classList.contains('page-body')) return wrapper.innerHTML;
+  if(wrapper && wrapper.classList && wrapper.classList.contains('page')){
+    const inner = wrapper.querySelector('.page-body');
+    if(inner) return inner.innerHTML;
+  }
+  return tmp.innerHTML;
+}
+function loadContentIntoEditor(html){
+  editorBody().innerHTML = extractBodyHtml(html);
+  bindAllDropZones();
+  rebindAllChips();
+  refreshAllCodeHolders();
+}
+function restoreAutosave(){
+  try{
+    const saved = localStorage.getItem('mmtd_autosave');
+    if(saved) loadContentIntoEditor(saved);
+  }catch(e){}
+}
+
+$('#btnSaveTpl').addEventListener('click', ()=>{
+  if(!editorBody()) return;
+  const data = { html: editorBody().innerHTML, savedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mail-merge-template.json';
+  a.click();
+  toast('Template saved.');
+});
+$('#btnLoadTpl').addEventListener('click', ()=> $('#tplFileInput').click());
+$('#tplFileInput').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const data = JSON.parse(ev.target.result);
+      loadContentIntoEditor(data.html);
+      const missing = [];
+      $$('.mf-chip', editorDoc()).forEach(c=>{ if(!state.headers.includes(c.dataset.field)) missing.push(c.dataset.field); });
+      if(missing.length && state.headers.length) { markMissingChips(missing); showMissingBanner([...new Set(missing)], state.headers); }
+      updatePreview();
+      toast('Template loaded.');
+    }catch(err){ toast('Invalid template file.'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ======================= EXPORT: PRINT ALL / DOWNLOAD PDF ======================= */
+$('#btnPrintAll').addEventListener('click', async ()=>{
+  if(!state.rows.length){ window.print(); return; }
+  const useAll = confirm('Print/Save all ' + state.rows.length + ' merged records as PDF?\nOK = all records.  Cancel = current record only.');
+  const win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>Mail Merge Export</title><style>'+extractDocStyles()+' body{margin:0;background:#fff;} .page{margin:0 auto 0;box-shadow:none;page-break-after:always;}</style></head><body></body></html>');
+  win.document.close();
+  showProgress('Preparing documents…');
+  const list = useAll ? state.rows.map((_,i)=>i) : [state.currentRecord];
+  for(let i=0;i<list.length;i++){
+    const merged = buildMergedPage(state.rows[list[i]]);
+    win.document.body.appendChild(merged);
+    if(i % 25 === 0){ setProgress(Math.round((i/list.length)*100), 'Preparing ' + (i+1) + ' / ' + list.length); await nextFrame(); }
+  }
+  hideProgress();
+  setTimeout(()=>{ win.focus(); win.print(); }, 300);
+});
+
+function extractDocStyles(){
+  return '.page{width:794px;min-height:1123px;background:#fff;font-family:'+getComputedStyle(document.documentElement).getPropertyValue('--font-doc')+';color:#1a1a1a;position:relative;}' +
+  '.page-body{padding:60px 55px;font-size:14px;line-height:1.6;}' +
+  '.page-body table td,.page-body table th{border:1px solid #999;padding:6px 9px;font-size:13px;}' +
+  '.page-body table{border-collapse:collapse;}' +
+  '.merged-missing{color:#d64545;background:#fdeaea;border-radius:4px;padding:0 3px;}' +
+  '@page{size:A4;margin:0;}';
+}
+function nextFrame(){ return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); }
+
+$('#btnDownloadPdf').addEventListener('click', async ()=>{
+  if(!window.jspdf){ toast('PDF library not available (check network access to jsdelivr).'); return; }
+  const rangeStr = state.rows.length ? prompt('Records to export as PDF (e.g. 1-20 or "current"). Max recommended: 300 at a time.', state.rows.length>1 ? ('1-'+Math.min(state.rows.length,20)) : 'current') : 'current';
+  if(rangeStr === null) return;
+  let indices = [];
+  if(rangeStr.trim().toLowerCase()==='current' || !state.rows.length){
+    indices = [state.currentRecord];
+  } else {
+    const m = rangeStr.match(/(\d+)\s*-\s*(\d+)/);
+    if(m){ const a=Math.max(1,parseInt(m[1])), b=Math.min(state.rows.length,parseInt(m[2])); for(let i=a;i<=b;i++) indices.push(i-1); }
+    else { const n = parseInt(rangeStr); indices = [isNaN(n)?state.currentRecord:(n-1)]; }
+  }
+  if(indices.length > 300 && !confirm('That is '+indices.length+' records — large exports can be slow in-browser. Use "Print / Save PDF" instead for big batches. Continue anyway?')) return;
+
+  showProgress('Generating PDF…');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','pt','a4');
+  const holder = document.createElement('div');
+  holder.style.position='fixed'; holder.style.left='-99999px'; holder.style.top='0';
+  document.body.appendChild(holder);
+
+  for(let i=0;i<indices.length;i++){
+    const merged = buildMergedPage(state.rows[indices[i]]);
+    merged.style.boxShadow='none'; merged.style.margin='0';
+    holder.innerHTML=''; holder.appendChild(merged);
+    await nextFrame();
+    const canvas = await html2canvas(merged, {scale:2, useCORS:true});
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const ratio = Math.min(pageW/canvas.width, pageH/canvas.height);
+    if(i>0) pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width*ratio, canvas.height*ratio);
+    setProgress(Math.round(((i+1)/indices.length)*100), 'Rendering record ' + (i+1) + ' / ' + indices.length);
+  }
+  document.body.removeChild(holder);
+  hideProgress();
+  pdf.save('mail-merge-export.pdf');
+  toast('PDF downloaded (' + indices.length + ' record(s)).');
+});
+
+/* ======================= REAL TINYMCE INIT =======================
+   Free, self-hosted TinyMCE (loaded straight from the npm package via
+   jsDelivr — no API key / cloud account needed). This is what actually
+   renders the menubar + toolbar + status bar shown in the screenshot. */
+tinymce.init({
+  selector: '#pageBody',
+  fixed_toolbar_container: '#editorToolbar',
+  menubar: 'file edit view insert format tools table',
+  toolbar:
+    'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | ' +
+    'forecolor backcolor | removeformat | alignleft aligncenter alignright alignjustify | ' +
+    'bullist numlist outdent indent | link image media table charmap hr | ' +
+    'pagebreakapp textboxapp rectapp circleapp | qrapp barcodeapp marginsapp | ' +
+    'searchreplace code fullscreen',
+  plugins: 'advlist autolink lists link image charmap preview anchor searchreplace ' +
+           'visualblocks code fullscreen insertdatetime media table help wordcount pagebreak',
+  min_height: 1123,
+  autoresize_bottom_margin: 0,
+  font_size_formats: Array.from({length: 40-8+1}, (_, i) => (i+8) + 'pt').join(' '),
+  fontsize_formats: Array.from({length: 40-8+1}, (_, i) => (i+8) + 'pt').join(' '),
+  branding: true,
+  promotion: false,
+  statusbar: true,
+  resize: true,
+  content_style: `
+    body{ font-family:'Calibri','Carlito',Arial,sans-serif; font-size:14px; line-height:1.6;
+          color:#1a1a1a; padding:60px 55px; margin:0; position:relative; }
+    blockquote{border-left:3px solid #b9c6dc;margin:10px 0;padding:4px 14px;color:#48566e;font-style:italic;}
+    pre{background:#f2f4f8;padding:10px 12px;border-radius:6px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;overflow:auto;}
+    hr{border:none;border-top:1px solid #c7cfdc;margin:16px 0;}
+    table{border-collapse:collapse;margin:10px 0;}
+    table td, table th{border:1px solid #999;padding:6px 9px;font-size:13px;}
+    img{max-width:100%;}
+    .page-break{display:block;height:0;border-top:2px dashed #9fb0c9;margin:20px 0;position:relative;}
+    .page-break::after{content:"Page Break";position:absolute;top:-9px;left:10px;background:#fff;color:#8393ad;font-size:10px;padding:0 6px;font-family:'Segoe UI',Arial,sans-serif;}
+    .mf-chip{display:inline-flex;align-items:center;gap:4px;background:#e8f0ff;border:1px solid #a9c4fb;color:#1e3a6e;border-radius:14px;padding:1px 6px 1px 9px;font-size:12.5px;font-weight:600;font-family:'Segoe UI',Arial,sans-serif;vertical-align:baseline;cursor:grab;line-height:1.7;white-space:nowrap;}
+    .mf-chip .chip-del{border:none;background:transparent;cursor:pointer;color:#3a5590;font-size:13px;padding:0 3px;border-radius:50%;line-height:1;}
+    .mf-chip.locked{background:#eef1f6;border-color:#c7ced9;color:#4a5568;cursor:default;}
+    .mf-chip.locked .chip-del{display:none;}
+    .mf-chip.mf-chip-missing{background:#fdeaea;border-color:#f0b6b6;color:#8a2323;}
+    .mf-chip.selected{outline:2px solid #2f6fed;outline-offset:1px;}
+    .textbox{position:absolute;border:1px dashed #9fb0c9;padding:6px 8px;min-width:80px;min-height:30px;background:rgba(255,255,255,.5);cursor:move;outline:none;}
+    .shape-rect{position:absolute;border:2px solid #33415c;background:rgba(47,111,237,.06);cursor:move;}
+    .shape-circle{position:absolute;border:2px solid #33415c;border-radius:50%;background:rgba(47,111,237,.06);cursor:move;}
+    .merged-value{font-weight:inherit;}
+    .merged-missing{color:#d64545;background:#fdeaea;border-radius:4px;padding:0 3px;}
+  `,
+  setup: function(editor){
+    editor.ui.registry.addButton('pagebreakapp', { text: '⤓ Break', tooltip: 'Insert page break', onAction: insertPageBreak });
+    editor.ui.registry.addButton('textboxapp', { text: '⬚T', tooltip: 'Insert text box', onAction: insertTextbox });
+    editor.ui.registry.addButton('rectapp', { text: '▭', tooltip: 'Insert rectangle', onAction: ()=> insertShape('shape-rect') });
+    editor.ui.registry.addButton('circleapp', { text: '◯', tooltip: 'Insert circle', onAction: ()=> insertShape('shape-circle') });
+    editor.ui.registry.addButton('qrapp', { text: '▤ QR', tooltip: 'Insert QR code', onAction: openQrModal });
+    editor.ui.registry.addButton('barcodeapp', { text: '🏷️ Barcode', tooltip: 'Insert barcode', onAction: openBarcodeModal });
+    editor.ui.registry.addButton('marginsapp', { text: '⬜ Margins', tooltip: 'Page margins', onAction: openMarginsModal });
+
+    editor.on('NodeChange', saveSelectionFromEditor);
+    editor.on('input change Undo Redo SetContent', scheduleUpdate);
+
+    editor.on('init', function(){
+      tinymceEditor = editor;
+      bindAllDropZones();
+      restoreAutosave();
+      refreshAllCodeHolders();
+      updatePreview();
+    });
+  }
+});
+
+})();
+</script>
+</body>
+</html>

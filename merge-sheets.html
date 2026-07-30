@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sheet Merger</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<style>
+  :root{
+    --ink:#1b2430;
+    --ink-soft:#5b6472;
+    --paper:#f3f5f7;
+    --card:#ffffff;
+    --line:#dfe4ea;
+    --accent:#2f6f4e;
+    --accent-dark:#234f38;
+    --accent-soft:#e3efe8;
+    --warn:#b5442e;
+    --warn-soft:#fbe9e5;
+    --radius:10px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;
+    min-height:100vh;
+  }
+  .topbar{
+    position:sticky; top:0; z-index:10;
+    backdrop-filter:blur(10px);
+    background:rgba(243,245,247,0.85);
+    border-bottom:1px solid var(--line);
+    padding:16px 24px;
+    display:flex; align-items:baseline; gap:10px;
+  }
+  .topbar h1{ font-size:18px; margin:0; letter-spacing:.2px; }
+  .topbar span.tag{
+    font-size:12px; color:var(--ink-soft); border:1px solid var(--line);
+    padding:2px 8px; border-radius:99px; background:var(--card);
+  }
+  main{
+    max-width:760px; margin:0 auto; padding:28px 20px 60px;
+    display:flex; flex-direction:column; gap:18px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px;
+  }
+  .step-label{
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 10px;
+  }
+  #dropzone{
+    border:2px dashed var(--line); border-radius:var(--radius);
+    padding:36px 20px; text-align:center; cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  #dropzone.hover, #dropzone:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  #dropzone p{ margin:0; color:var(--ink-soft); font-size:14px; }
+  #dropzone p.main{ color:var(--ink); font-size:15px; font-weight:600; margin-bottom:4px; }
+  #fileInput{ display:none; }
+
+  .filerow{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; background:var(--paper); border-radius:8px; border:1px solid var(--line);
+  }
+  .filerow .name{ font-weight:600; font-size:14px; }
+  .filerow .meta{ font-size:12px; color:var(--ink-soft); }
+  .filerow button{
+    border:none; background:none; color:var(--warn); font-size:12px; cursor:pointer; font-weight:600;
+  }
+
+  table.sheets{ width:100%; border-collapse:collapse; margin-top:14px; font-size:13.5px; }
+  table.sheets th, table.sheets td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
+  table.sheets th{ color:var(--ink-soft); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  table.sheets tr:last-child td{ border-bottom:none; }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accent); color:#fff; border:none; border-radius:8px;
+    padding:12px 20px; font-size:14px; font-weight:600; cursor:pointer;
+    transition:background .15s;
+  }
+  .btn:hover:not(:disabled){ background:var(--accent-dark); }
+  .btn:disabled{ background:#b9c0c8; cursor:not-allowed; }
+  .btn.secondary{ background:var(--card); color:var(--accent-dark); border:1px solid var(--accent); }
+  .btn.secondary:hover:not(:disabled){ background:var(--accent-soft); }
+
+  .progress-wrap{ margin-top:14px; display:none; }
+  .progress-track{ height:8px; background:var(--line); border-radius:99px; overflow:hidden; }
+  .progress-fill{ height:100%; width:0%; background:var(--accent); transition:width .2s; }
+  .progress-text{ font-size:12.5px; color:var(--ink-soft); margin-top:6px; }
+
+  .result{ display:none; }
+  .result .stat{
+    display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px;
+  }
+  .result .stat:last-of-type{ border-bottom:none; }
+  .result .stat b{ font-weight:700; }
+
+  .msg{
+    display:none; padding:12px 14px; border-radius:8px; font-size:13.5px; margin-top:10px;
+  }
+  .msg.error{ display:block; background:var(--warn-soft); color:var(--warn); }
+
+  footer{ text-align:center; color:var(--ink-soft); font-size:12px; padding:20px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Sheet Merger</h1>
+  <span class="tag">multi-sheet → one sheet</span>
+</div>
+
+<main>
+
+  <div class="card">
+    <p class="step-label">Step 1 — Upload</p>
+    <div id="dropzone">
+      <p class="main">Drop an Excel file here, or click to browse</p>
+      <p>.xlsx or .xls · all sheets in the file will be combined</p>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div id="fileRow" style="display:none; margin-top:12px;">
+      <div class="filerow">
+        <div>
+          <div class="name" id="fileName"></div>
+          <div class="meta" id="fileMeta"></div>
+        </div>
+        <button id="clearFile" type="button">Remove</button>
+      </div>
+    </div>
+    <div class="msg error" id="uploadError"></div>
+  </div>
+
+  <div class="card" id="sheetsCard" style="display:none;">
+    <p class="step-label">Step 2 — Sheets detected</p>
+    <table class="sheets">
+      <thead><tr><th>Sheet name</th><th>Rows</th><th>Columns</th></tr></thead>
+      <tbody id="sheetsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="mergeCard" style="display:none;">
+    <p class="step-label">Step 3 — Merge</p>
+    <p style="margin:0 0 14px; font-size:13.5px; color:var(--ink-soft);">
+      Every sheet gets stacked into one combined sheet. A <b>Source Sheet</b> column is added
+      so you can tell rows apart afterward. Columns are matched by their actual position
+      (A, B, C…) — if a sheet's data starts further right than another sheet's, it stays
+      offset the same way in the merged result.
+    </p>
+    <button class="btn" id="mergeBtn">Merge sheets</button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">Working…</div>
+    </div>
+
+    <div class="msg error" id="mergeError"></div>
+
+    <div class="result" id="result">
+      <div class="stat"><span>Sheets merged</span><b id="resSheets"></b></div>
+      <div class="stat"><span>Total rows</span><b id="resRows"></b></div>
+      <div class="stat"><span>Total columns</span><b id="resCols"></b></div>
+      <div style="margin-top:16px;">
+        <button class="btn" id="downloadBtn">Download merged workbook</button>
+        <button class="btn secondary" id="mergeAgainBtn">Merge another file</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>Runs entirely in your browser — the file never leaves your machine.</footer>
+
+<script>
+// ---- Web Worker source (built as a Blob so this stays a single file) ----
+const workerSource = `
+importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+
+self.onmessage = function(e) {
+  try {
+    const { buffer } = e.data;
+    self.postMessage({ type: 'progress', text: 'Reading workbook…', pct: 10 });
+
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheetNames = workbook.SheetNames;
+
+    // Build rows for a sheet by explicit column position, not by SheetJS's
+    // auto-generated object keys. This avoids columns silently colliding or
+    // shifting when a sheet has duplicate or blank cells — every row is
+    // treated as data and aligned purely by raw column position (A, B, C…)
+    // across all sheets.
+    //
+    // SheetJS's header:1 output is indexed relative to the sheet's used
+    // range (e.g. if a sheet's data starts at column B, array index 0 is
+    // column B, not A). That loses real column position when sheets start
+    // at different columns, so we re-map every row to absolute column
+    // position (A = 0) before doing anything else.
+    function sheetToRows(ws) {
+      const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
+      if (!range) return { headers: [], rows: [] };
+      const totalCols = range.e.c + 1; // absolute width, counted from column A
+      const relStartCol = range.s.c;
+      const relAoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      const aoa = relAoa.map(relRow => {
+        const absRow = new Array(totalCols).fill('');
+        relRow.forEach((v, i) => { absRow[relStartCol + i] = v; });
+        return absRow;
+      });
+      if (!aoa.length) return { headers: [], rows: [] };
+
+      const headers = [];
+      for (let idx = 0; idx < totalCols; idx++) headers.push('Column ' + (idx + 1));
+
+      const rows = aoa
+        .filter(r => r.some(cell => String(cell).trim() !== ''))
+        .map(r => {
+          const obj = {};
+          headers.forEach((h, idx) => { obj[h] = (r[idx] === undefined ? '' : r[idx]); });
+          return obj;
+        });
+
+      return { headers, rows };
+    }
+
+    // First pass: collect union of headers, in order of first appearance
+    const headerOrder = [];
+    const headerSet = new Set();
+    const perSheetRows = [];
+
+    sheetNames.forEach((name, idx) => {
+      const ws = workbook.Sheets[name];
+      const { headers, rows } = sheetToRows(ws);
+      perSheetRows.push(rows);
+      headers.forEach(h => {
+        if (!headerSet.has(h)) { headerSet.add(h); headerOrder.push(h); }
+      });
+      self.postMessage({
+        type: 'progress',
+        text: 'Scanned sheet "' + name + '" (' + (idx + 1) + '/' + sheetNames.length + ')',
+        pct: 10 + Math.round(((idx + 1) / sheetNames.length) * 40)
+      });
+    });
+
+    const finalHeaders = ['Source Sheet', ...headerOrder];
+
+    // Second pass: build merged rows
+    const mergedRows = [];
+    sheetNames.forEach((name, idx) => {
+      const rows = perSheetRows[idx];
+      rows.forEach(row => {
+        const out = { 'Source Sheet': name };
+        headerOrder.forEach(h => { out[h] = (h in row) ? row[h] : ''; });
+        mergedRows.push(out);
+      });
+      self.postMessage({
+        type: 'progress',
+        text: 'Merging sheet "' + name + '" (' + (idx + 1) + '/' + sheetNames.length + ')',
+        pct: 50 + Math.round(((idx + 1) / sheetNames.length) * 35)
+      });
+    });
+
+    self.postMessage({ type: 'progress', text: 'Building merged workbook…', pct: 90 });
+
+    const outWs = XLSX.utils.json_to_sheet(mergedRows, { header: finalHeaders });
+    const outWb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(outWb, outWs, 'Merged');
+    const outArray = XLSX.write(outWb, { bookType: 'xlsx', type: 'array' });
+
+    self.postMessage({
+      type: 'done',
+      buffer: outArray,
+      sheetsMerged: sheetNames.length,
+      totalRows: mergedRows.length,
+      totalCols: finalHeaders.length
+    }, [outArray]);
+
+  } catch (err) {
+    self.postMessage({ type: 'error', message: err.message || String(err) });
+  }
+};
+`;
+
+let worker = null;
+let currentFile = null;
+let currentBuffer = null;
+let mergedBlob = null;
+
+function makeWorker() {
+  const blob = new Blob([workerSource], { type: 'application/javascript' });
+  return new Worker(URL.createObjectURL(blob));
+}
+
+// ---- Upload handling ----
+$('#dropzone').on('click', () => $('#fileInput').trigger('click'));
+
+$('#dropzone').on('dragover', function(e){
+  e.preventDefault(); $(this).addClass('hover');
+});
+$('#dropzone').on('dragleave drop', function(e){
+  e.preventDefault(); $(this).removeClass('hover');
+});
+$('#dropzone').on('drop', function(e){
+  const f = e.originalEvent.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+$('#fileInput').on('change', function(){
+  const f = this.files[0];
+  if (f) handleFile(f);
+});
+
+$('#clearFile').on('click', resetAll);
+$('#mergeAgainBtn').on('click', resetAll);
+
+function resetAll(){
+  currentFile = null; currentBuffer = null; mergedBlob = null;
+  $('#fileInput').val('');
+  $('#fileRow').hide();
+  $('#sheetsCard').hide();
+  $('#mergeCard').hide();
+  $('#result').hide();
+  $('#uploadError').hide().text('');
+  $('#mergeError').hide().text('');
+  $('#progressWrap').hide();
+  $('#mergeBtn').prop('disabled', false).text('Merge sheets');
+}
+
+function handleFile(file){
+  $('#uploadError').hide().text('');
+  const okExt = /\.(xlsx|xls)$/i.test(file.name);
+  if (!okExt) {
+    $('#uploadError').text("That file doesn't look like an .xlsx or .xls workbook.").show();
+    return;
+  }
+  currentFile = file;
+  $('#fileName').text(file.name);
+  $('#fileMeta').text((file.size / 1024).toFixed(1) + ' KB');
+  $('#fileRow').show();
+  $('#result').hide();
+  $('#mergeError').hide().text('');
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    currentBuffer = e.target.result;
+    previewSheets(currentBuffer.slice(0)); // slice: keep a copy, worker will consume the original later
+  };
+  reader.onerror = function(){
+    $('#uploadError').text('Could not read that file. Try again.').show();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Quick client-side preview of sheet names/sizes before merging (lightweight, main thread is fine for this)
+function previewSheets(buffer){
+  $('#sheetsBody').empty();
+  try {
+    const wb = XLSX.read ? XLSX.read(buffer, { type: 'array' }) : null;
+  } catch(e) { /* XLSX not loaded on main thread yet — fine, handled below */ }
+
+  // Load SheetJS on the main thread only for this lightweight preview step
+  if (typeof XLSX === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.onload = () => renderPreview(buffer);
+    script.onerror = () => {
+      // Preview isn't essential — merge will still work via the worker
+      $('#sheetsCard').hide();
+      $('#mergeCard').show();
+    };
+    document.head.appendChild(script);
+  } else {
+    renderPreview(buffer);
+  }
+}
+
+let lastPreviewBuffer = null;
+
+function renderPreview(buffer){
+  lastPreviewBuffer = buffer;
+  $('#sheetsBody').empty();
+  try {
+    const wb = XLSX.read(buffer.slice(0), { type: 'array' });
+    wb.SheetNames.forEach(name => {
+      const ws = wb.Sheets[name];
+      const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null;
+      const totalCols = range ? (range.e.c + 1) : 0;
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      const dataRows = aoa.filter(r => r.some(cell => String(cell).trim() !== ''));
+      $('#sheetsBody').append(
+        `<tr><td>${escapeHtml(name)}</td><td>${dataRows.length}</td><td>${totalCols}</td></tr>`
+      );
+    });
+    $('#sheetsCard').show();
+    $('#mergeCard').show();
+  } catch (e) {
+    $('#uploadError').text('Could not parse that workbook: ' + e.message).show();
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---- Merge handling ----
+$('#mergeBtn').on('click', function(){
+  if (!currentBuffer) return;
+  $('#mergeError').hide().text('');
+  $('#result').hide();
+  $('#mergeBtn').prop('disabled', true).text('Merging…');
+  $('#progressWrap').show();
+  $('#progressFill').css('width', '0%');
+  $('#progressText').text('Starting…');
+
+  if (worker) { worker.terminate(); }
+  worker = makeWorker();
+
+  worker.onmessage = function(e){
+    const data = e.data;
+    if (data.type === 'progress') {
+      $('#progressFill').css('width', data.pct + '%');
+      $('#progressText').text(data.text);
+    } else if (data.type === 'done') {
+      $('#progressFill').css('width', '100%');
+      $('#progressText').text('Done.');
+      mergedBlob = new Blob([data.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      $('#resSheets').text(data.sheetsMerged);
+      $('#resRows').text(data.totalRows.toLocaleString());
+      $('#resCols').text(data.totalCols);
+      $('#result').show();
+      $('#mergeBtn').prop('disabled', false).text('Merge sheets');
+    } else if (data.type === 'error') {
+      $('#mergeError').text('Merge failed: ' + data.message).show();
+      $('#progressWrap').hide();
+      $('#mergeBtn').prop('disabled', false).text('Merge sheets');
+    }
+  };
+
+  worker.onerror = function(err){
+    $('#mergeError').text('Merge failed: ' + err.message).show();
+    $('#progressWrap').hide();
+    $('#mergeBtn').prop('disabled', false).text('Merge sheets');
+  };
+
+  // Worker consumes the buffer (transferable) — send a fresh copy so the original stays untouched
+  const copy = currentBuffer.slice(0);
+  worker.postMessage({ buffer: copy }, [copy]);
+});
+
+$('#downloadBtn').on('click', function(){
+  if (!mergedBlob || !currentFile) return;
+  const base = currentFile.name.replace(/\.(xlsx|xls)$/i, '');
+  const url = URL.createObjectURL(mergedBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = base + '-merged.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+});
+</script>
+</body>
+</html>

@@ -18,6 +18,7 @@
     { id: 'mail',      label: 'Mail Tools',    icon: 'fa-envelope',     grad: 'grad-mail' },
     { id: 'college',   label: 'College Tools', icon: 'fa-graduation-cap', grad: 'grad-college' },
     { id: 'ai',        label: 'AI Tools',      icon: 'fa-robot',        grad: 'grad-ai' },
+    { id: 'image',     label: 'Image Tools',   icon: 'fa-robot',        grad: 'grad-image' },
     { id: 'utilities', label: 'Utilities',     icon: 'fa-toolbox',      grad: 'grad-utils' }
   ];
 
@@ -45,6 +46,10 @@
     { id: 'email-validator', name: 'Email Validator', category: 'mail', icon: 'fa-envelope-circle-check', desc: 'Verify email addresses in bulk and filter out invalid entries.', dateAdded: 2 },
     { id: 'bulk-email-sender', name: 'Bulk Email Sender', category: 'mail', icon: 'fa-paper-plane', desc: 'Schedule and send bulk emails with delivery tracking built in.', dateAdded: 1 },
 
+	 // ---- Image Tools ----
+    { id: 'max-photo', name: 'Max Size Photo', category: 'image', icon: 'fa-envelope-open-text', desc: 'Passport size photo to Multple Photo to fit Max size.', dateAdded: 14, popular: true },
+  
+
     // ---- College Tools ----
     { id: 'exam-scheduler', name: 'Exam Scheduler', category: 'college', icon: 'fa-calendar-days', desc: 'Auto-generate clash-free exam timetables across departments.', dateAdded: 15, popular: true },
     { id: 'hall-allocation', name: 'Hall Allocation', category: 'college', icon: 'fa-chalkboard', desc: 'Allocate students to examination halls with seating plans.', dateAdded: 16 },
@@ -60,6 +65,8 @@
     { id: 'ai-image-generator', name: 'AI Image Generator', category: 'ai', icon: 'fa-image', desc: 'Generate original images and illustrations from a text prompt.', dateAdded: 23 },
     { id: 'ai-question-generator', name: 'AI Question Generator', category: 'ai', icon: 'fa-circle-question', desc: 'Generate exam-ready questions from any topic or syllabus.', dateAdded: 24 },
     { id: 'ai-assistant', name: 'AI Assistant', category: 'ai', icon: 'fa-robot', desc: 'A general-purpose AI assistant for everyday admin tasks.', dateAdded: 25, isNew: true, popular: true },
+
+
 
     // ---- Utilities ----
     { id: 'qr-generator', name: 'QR Generator', category: 'utilities', icon: 'fa-qrcode', desc: 'Create scannable QR codes for links, text, or contact details.', dateAdded: 30, isNew: true, popular: true },

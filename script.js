@@ -61,7 +61,7 @@
     { id: 'student-register-search', name: 'Student Register Search', category: 'college', icon: 'fa-id-card', desc: 'Look up student register numbers and records instantly.', dateAdded: 21 },
 
     // ---- AI Tools ----
-    { id: 'ai-text-generator', name: 'AI Text Generator', category: 'ai', icon: 'fa-pen-nib', desc: 'Draft letters, reports, and content with an AI writing assistant.', dateAdded: 22, popular: true },
+    { id: 'Encript', name: 'Encript', category: 'ai', icon: 'fa-pen-nib', desc: 'Encript the html file with source code protection.', dateAdded: 22, popular: true },
     { id: 'ai-image-generator', name: 'AI Image Generator', category: 'ai', icon: 'fa-image', desc: 'Generate original images and illustrations from a text prompt.', dateAdded: 23 },
     { id: 'ai-question-generator', name: 'AI Question Generator', category: 'ai', icon: 'fa-circle-question', desc: 'Generate exam-ready questions from any topic or syllabus.', dateAdded: 24 },
     { id: 'ai-assistant', name: 'AI Assistant', category: 'ai', icon: 'fa-robot', desc: 'A general-purpose AI assistant for everyday admin tasks.', dateAdded: 25, isNew: true, popular: true },

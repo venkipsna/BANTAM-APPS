@@ -26,7 +26,7 @@
   const TOOLS = [
     // ---- Excel Tools ----
     { id: 'merge-sheets', name: 'Merge Sheets', category: 'excel', icon: 'fa-object-group', desc: 'Combine multiple Excel sheets into a single consolidated workbook in seconds.', dateAdded: 10, popular: true },
-    { id: 'column-combiner', name: 'Column-Combiner', category: 'excel', icon: 'fa-scissors', desc: 'Load a sheet, choose a column to group by, then choose the column(s) whose values should spread across separate columns for each group.', dateAdded: 9 },
+    { id: 'Column-Combiner', name: 'Column Combiner', category: 'excel', icon: 'fa-scissors', desc: 'Load a sheet, choose a column to group by, then choose the column(s) whose values should spread across separate columns for each group.', dateAdded: 9 },
     { id: 'compare-excel', name: 'Compare Excel', category: 'excel', icon: 'fa-code-compare', desc: 'Spot differences between two spreadsheets instantly, cell by cell.', dateAdded: 8 },
     { id: 'remove-duplicates', name: 'Remove Duplicates', category: 'excel', icon: 'fa-clone', desc: 'Clean up rows and remove duplicate entries across any column set.', dateAdded: 7, popular: true },
     { id: 'grade-converter', name: 'Grade Converter', category: 'excel', icon: 'fa-percent', desc: 'Convert raw marks into grades and grade points using custom scales.', dateAdded: 27, isNew: true, popular: true },

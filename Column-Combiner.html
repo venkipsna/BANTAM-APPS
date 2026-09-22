@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Column Combiner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#151f38; --panel2:#1c2947; --border:#2a3a5c;
+    --text:#e6ebf5; --muted:#93a0bd; --accent:#5ab0ff; --accent2:#7c5cff;
+    --good:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+    background:linear-gradient(160deg,#0b1222,#111c36 60%,#0b1222);
+    color:var(--text); min-height:100vh; padding:28px 18px 60px;
+  }
+  h1{font-size:22px; margin:0 0 4px; letter-spacing:.3px;}
+  .sub{color:var(--muted); margin:0 0 24px; font-size:13.5px;}
+  .wrap{max-width:1320px; margin:0 auto;}
+  .layout{display:flex; gap:18px; align-items:flex-start;}
+  .layout .left{flex:0 0 360px; max-width:360px; min-width:280px;}
+  .layout .right{flex:1; min-width:0;}
+  @media (max-width:860px){
+    .layout{flex-direction:column;}
+    .layout .left{flex:1 1 auto; max-width:100%;}
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px; margin-bottom:18px; box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  .card.compact{padding:14px;}
+  .card h2{
+    font-size:14px; text-transform:uppercase; letter-spacing:.8px; color:var(--accent);
+    margin:0 0 14px; display:flex; align-items:center; gap:8px;
+  }
+  .badge{
+    background:var(--panel2); border:1px solid var(--border); color:var(--muted);
+    font-size:10.5px; padding:2px 8px; border-radius:20px; text-transform:none; letter-spacing:.2px;
+  }
+  .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center;}
+  .drop{
+    border:2px dashed var(--border); border-radius:var(--radius); padding:22px;
+    text-align:center; color:var(--muted); cursor:pointer; flex:1; min-width:240px;
+    transition:.15s;
+  }
+  .drop:hover, .drop.drag{border-color:var(--accent); color:var(--text); background:rgba(90,176,255,.05);}
+  .drop input{display:none;}
+  select, button, input[type=text]{
+    background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:8px; padding:8px 11px; font-size:13px; font-family:inherit;
+  }
+  select:focus, input:focus{outline:1px solid var(--accent);}
+  button{cursor:pointer; transition:.15s;}
+  button:hover{border-color:var(--accent); color:var(--accent);}
+  button.primary{
+    background:linear-gradient(135deg,var(--accent2),var(--accent)); color:#fff; border:none;
+    font-weight:600; padding:10px 18px;
+  }
+  button.primary:hover{filter:brightness(1.08); color:#fff;}
+  button.small{padding:5px 9px; font-size:12px;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+
+  .builder{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; min-height:34px; padding:8px; border:1px dashed var(--border); border-radius:8px; margin-top:12px; align-items:center;}
+  .chips.empty::before{content:'Selected columns will appear here, one per chip — add columns one at a time from the dropdown above.'; color:var(--muted); font-size:12px;}
+  .chip{
+    background:var(--panel2); border:1px solid var(--accent); color:var(--accent);
+    padding:5px 8px 5px 12px; border-radius:20px; font-size:12.5px; display:flex; align-items:center; gap:7px;
+  }
+  .chip .x{cursor:pointer; color:var(--muted); font-weight:700; width:16px; height:16px; text-align:center; line-height:16px; border-radius:50%;}
+  .chip .x:hover{background:var(--bad); color:#fff;}
+
+  select[multiple]{min-height:150px; padding:4px; line-height:1.9;}
+  select[multiple] option{padding:5px 8px; border-radius:6px;}
+  select[multiple] option:checked{background:linear-gradient(135deg,var(--accent2),var(--accent)); color:#fff;}
+
+  table.rules{width:100%; border-collapse:collapse; font-size:13px; margin-top:14px;}
+  table.rules th{text-align:left; color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px; padding:6px 10px; border-bottom:1px solid var(--border);}
+  table.rules td{padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle;}
+  .op-pill{font-size:10.5px; padding:2px 8px; border-radius:20px; border:1px solid var(--accent2); color:var(--accent2);}
+  .src-pill{font-size:10.5px; padding:2px 7px; border-radius:6px; background:var(--panel2); border:1px solid var(--border); margin:1px 3px 1px 0; display:inline-block;}
+
+  .result-wrap{overflow:auto; max-height:640px; border:1px solid var(--border); border-radius:8px;}
+  table.result{border-collapse:collapse; width:100%; font-size:12px; white-space:nowrap;}
+  table.result th{position:sticky; top:0; background:#182544; color:var(--accent); text-align:left; padding:6px 9px; border-bottom:2px solid var(--border); z-index:1;}
+  table.result th.computed{color:var(--good);}
+  table.result td{padding:5px 9px; border-bottom:1px solid rgba(255,255,255,.05);}
+  table.result td.computed{color:var(--good); font-weight:600;}
+  table.result tr:nth-child(even) td{background:rgba(255,255,255,.015);}
+
+  .stat{display:flex; gap:22px; flex-wrap:wrap; margin-top:14px;}
+  .stat div{font-size:12px; color:var(--muted);}
+  .stat b{color:var(--text); font-size:16px; display:block;}
+  .status{font-size:12.5px; color:var(--muted); margin-top:8px; min-height:16px;}
+  .status.busy{color:var(--warn);}
+  .status.ok{color:var(--good);}
+  .status.err{color:var(--bad);}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px;}
+  .hint{font-size:11.5px; color:var(--muted); margin-top:8px;}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:30px 0;}
+  .spinner{width:14px; height:14px; border:2px solid rgba(255,255,255,.25); border-top-color:var(--warn); border-radius:50%; display:inline-block; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Column Combiner</h1>
+  <p class="sub">Load a sheet, choose a column to group by, then choose the column(s) whose values should spread across separate columns for each group.</p>
+
+  <div class="layout">
+    <div class="left">
+      <div class="card">
+        <h2>1 · Load data <span class="badge">CSV / XLSX</span></h2>
+        <div class="row">
+          <label class="drop" id="dropZone">
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.tsv,.txt">
+            <div id="dropLabel">📄 Click or drop a CSV / Excel file here</div>
+          </label>
+        </div>
+        <div class="status" id="loadStatus"></div>
+      </div>
+
+      <div class="card" id="configCard" style="display:none;">
+        <h2>2 · Group by column <span class="badge" id="rowCountBadge"></span></h2>
+        <div class="builder">
+          <div class="field" style="flex:1; min-width:0;">
+            <label>Group by</label>
+            <select id="groupByPicker" style="width:100%;"></select>
+          </div>
+        </div>
+        <div class="hint">Rows that share the same value in this column are collapsed into one output row.</div>
+      </div>
+
+      <div class="card" id="ruleCard" style="display:none;">
+        <h2>3 · Combine columns</h2>
+
+        <div class="field">
+          <label>Combine columns</label>
+          <select id="colMultiPicker" multiple style="width:100%;"></select>
+        </div>
+
+        <div class="hint">Ctrl/Cmd-click (or tap each, on mobile) to pick several — e.g. "register no" — so each group's values land side by side in "register no 1", "register no 2", "register no 3"…</div>
+
+        <div class="toolbar">
+          <button class="primary" id="runBtn" disabled>⚙ Run combine</button>
+          <span class="status" id="runStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="card compact" id="resultCard" style="display:none;">
+        <h2>4 · Result</h2>
+        <div class="result-wrap"><table class="result" id="resultTable"></table></div>
+        <div class="stat">
+          <div><b id="statRows">0</b>group rows</div>
+          <div><b id="statCols">0</b>combined columns added</div>
+          <div><b id="statTime">0ms</b>worker time</div>
+        </div>
+        <div class="toolbar">
+          <button id="exportCsvBtn">⬇ Export CSV</button>
+          <button id="exportXlsxBtn">⬇ Export Excel</button>
+        </div>
+      </div>
+
+      <div class="card" id="emptyCard">
+        <div class="empty">Load a file on the left to get started.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+$(function(){
+
+  let headers = [];
+  let rows = [];          // array of arrays
+  let groupIdx = null;    // index of the column to group by
+  let worker = null;
+  let lastResult = null;
+  let lastKeepCount = 0;  // how many leading columns in the last result are original (not spread)
+
+  // ---------- Web Worker (inlined via Blob so the file stays single-file) ----------
+  const workerSrc = `
+    self.onmessage = function(e){
+      const t0 = performance.now();
+      const { headers, rows, groupIdx, spreadCols } = e.data;
+
+      // Group rows by the value in the group-by column
+      const order = [];
+      const groups = new Map();
+      rows.forEach(row => {
+        const key = row[groupIdx];
+        const keyStr = String(key === null || key === undefined ? '' : key);
+        if (!groups.has(keyStr)){ groups.set(keyStr, { key, rows: [] }); order.push(keyStr); }
+        groups.get(keyStr).rows.push(row);
+      });
+
+      // Widest group decides how many numbered columns each spread column needs
+      let maxCount = 0;
+      order.forEach(k => { maxCount = Math.max(maxCount, groups.get(k).rows.length); });
+
+      const keepIdx = headers.map((h, i) => i).filter(i => spreadCols.indexOf(i) === -1);
+
+      const outHeaders = keepIdx.map(i => headers[i]);
+      spreadCols.forEach(ci => {
+        for (let n = 1; n <= maxCount; n++) outHeaders.push(headers[ci] + ' ' + n);
+      });
+
+      // If one of the kept columns looks like a serial-number column (e.g. "sl.no"),
+      // renumber it sequentially in the output instead of keeping the original value.
+      const slNoPos = keepIdx.findIndex(i => /^s\.?\s*l\.?\s*no\.?$/i.test(String(headers[i]).trim()));
+
+      const outRows = order.map((keyStr, gi) => {
+        const g = groups.get(keyStr);
+        const base = keepIdx.map((i, pos) => pos === slNoPos ? (gi + 1) : g.rows[0][i]);
+        const spread = [];
+        spreadCols.forEach(ci => {
+          for (let n = 0; n < maxCount; n++){
+            const r = g.rows[n];
+            const v = r ? r[ci] : '';
+            spread.push(v === null || v === undefined ? '' : v);
+          }
+        });
+        return base.concat(spread);
+      });
+
+      // Drop any resulting column (original or spread) with no value in any output row.
+      const isFilled = v => v !== '' && v !== null && v !== undefined;
+      const finalIdx = outHeaders.map((h, i) => i).filter(i => outRows.some(r => isFilled(r[i])));
+      const finalHeaders = finalIdx.map(i => outHeaders[i]);
+      const finalRows = outRows.map(r => finalIdx.map(i => r[i]));
+      const finalKeepCount = finalIdx.filter(i => i < keepIdx.length).length;
+
+      self.postMessage({ outRows: finalRows, outHeaders: finalHeaders, keepCount: finalKeepCount, ms: performance.now() - t0 });
+    };
+  `;
+  function makeWorker(){
+    if (worker) worker.terminate();
+    const blob = new Blob([workerSrc], { type: 'application/javascript' });
+    worker = new Worker(URL.createObjectURL(blob));
+  }
+
+  // ---------- File loading ----------
+  const dropZone = $('#dropZone');
+  dropZone.on('dragover', e => { e.preventDefault(); dropZone.addClass('drag'); });
+  dropZone.on('dragleave', () => dropZone.removeClass('drag'));
+  dropZone.on('drop', e => {
+    e.preventDefault(); dropZone.removeClass('drag');
+    const f = e.originalEvent.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  $('#fileInput').on('change', function(){
+    if (this.files[0]) handleFile(this.files[0]);
+  });
+
+  function setStatus(el, msg, cls){ $(el).attr('class','status ' + (cls||'')).html(msg); }
+
+  function handleFile(file){
+    $('#dropLabel').text('📄 ' + file.name);
+    setStatus('#loadStatus', '<span class="spinner"></span>Reading file…', 'busy');
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      try{
+        const isCsvLike = /\.(csv|tsv|txt)$/i.test(file.name);
+        const wb = isCsvLike ? XLSX.read(evt.target.result, { type:'string' }) : XLSX.read(evt.target.result, { type:'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header:1, raw:true, defval:'' });
+        const removed = loadRows(json);
+        const removedMsg = removed ? ' (' + removed + ' blank column' + (removed > 1 ? 's' : '') + ' removed)' : '';
+        setStatus('#loadStatus', 'Loaded ' + rows.length + ' rows from "' + wb.SheetNames[0] + '"' + removedMsg + '.', 'ok');
+      }catch(err){
+        setStatus('#loadStatus', 'Could not read that file: ' + err.message, 'err');
+      }
+    };
+    if (/\.(csv|tsv|txt)$/i.test(file.name)) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+  }
+
+  // A column with no value in ANY row is dropped entirely — that's what catches
+  // stray "(unnamed)" columns and any other column that's empty top to bottom.
+  function dropBlankColumns(rawHeaders, rawRows){
+    const isFilled = v => v !== '' && v !== null && v !== undefined;
+    const keepIdx = rawHeaders.map((h, i) => i).filter(i => rawRows.some(r => isFilled(r[i])));
+    return {
+      headers: keepIdx.map(i => rawHeaders[i]),
+      rows: rawRows.map(r => keepIdx.map(i => r[i])),
+      removed: rawHeaders.length - keepIdx.length
+    };
+  }
+
+  function loadRows(json){
+    if (!json.length) throw new Error('No data found');
+    const rawHeaders = json[0].map(h => String(h).trim() || '(unnamed)');
+    const rawRows = json.slice(1).filter(r => r.some(c => c !== '' && c !== null && c !== undefined));
+    const cleaned = dropBlankColumns(rawHeaders, rawRows);
+    headers = cleaned.headers;
+    rows = cleaned.rows;
+    groupIdx = 0;
+    populateGroupByPicker();
+    populateColMultiPicker();
+    $('#configCard').show();
+    $('#ruleCard').show();
+    $('#emptyCard').hide();
+    $('#resultCard').hide();
+    $('#rowCountBadge').text(rows.length + ' rows × ' + headers.length + ' columns');
+    $('#runBtn').prop('disabled', true);
+    return cleaned.removed;
+  }
+
+  function populateGroupByPicker(){
+    const sel = $('#groupByPicker').empty();
+    headers.forEach((h, i) => sel.append(`<option value="${i}">${escapeHtml(h)}</option>`));
+    sel.val(groupIdx);
+  }
+
+  $('#groupByPicker').on('change', function(){
+    groupIdx = parseInt($(this).val(), 10);
+    populateColMultiPicker();
+    $('#runBtn').prop('disabled', true);
+  });
+
+  // Dynamically builds one option per loaded column (except the group-by column),
+  // so any sheet's headers — register no, mark1..mark4, or anything else — show up automatically.
+  function populateColMultiPicker(){
+    const sel = $('#colMultiPicker').empty();
+    headers.forEach((h, i) => {
+      if (i === groupIdx) return; // spreading the group-by column against itself isn't useful
+      sel.append(`<option value="${i}">${escapeHtml(h)}</option>`);
+    });
+    sel.attr('size', Math.max(4, Math.min(10, sel.children().length)));
+  }
+
+  $('#colMultiPicker').on('change', function(){
+    $('#runBtn').prop('disabled', getCheckedCols().length === 0);
+  });
+
+  function getCheckedCols(){
+    return $('#colMultiPicker').val() ? $('#colMultiPicker').val().map(v => parseInt(v, 10)) : [];
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ---------- Run via Web Worker ----------
+  $('#runBtn').on('click', function(){
+    const spreadCols = getCheckedCols();
+    if (!spreadCols.length) return;
+    setStatus('#runStatus', '<span class="spinner"></span>Combining in Web Worker…', 'busy');
+    $('#runBtn').prop('disabled', true);
+    makeWorker();
+    worker.onmessage = function(e){
+      renderResult(e.data.outRows, e.data.outHeaders, e.data.keepCount, e.data.ms);
+      setStatus('#runStatus', 'Done — grouped ' + rows.length + ' rows into ' + e.data.outRows.length + ' in ' + e.data.ms.toFixed(1) + 'ms.', 'ok');
+      $('#runBtn').prop('disabled', false);
+    };
+    worker.onerror = function(err){
+      setStatus('#runStatus', 'Worker error: ' + err.message, 'err');
+      $('#runBtn').prop('disabled', false);
+    };
+    worker.postMessage({ headers, rows, groupIdx, spreadCols });
+  });
+
+  function renderResult(outRows, outHeaders, keepCount, ms){
+    lastKeepCount = keepCount;
+    const allHeaders = outHeaders;
+    lastResult = { headers: allHeaders, outRows };
+    const table = $('#resultTable').empty();
+    const thead = $('<thead><tr></tr></thead>');
+    allHeaders.forEach((h, i) => {
+      const cls = i >= keepCount ? ' class="computed"' : '';
+      thead.find('tr').append('<th' + cls + '>' + escapeHtml(h) + '</th>');
+    });
+    table.append(thead);
+    const tbody = $('<tbody></tbody>');
+    outRows.forEach(r => {
+      const tr = $('<tr></tr>');
+      r.forEach((c, i) => {
+        const cls = i >= keepCount ? ' class="computed"' : '';
+        tr.append('<td' + cls + '>' + escapeHtml(c === null || c === undefined ? '' : c) + '</td>');
+      });
+      tbody.append(tr);
+    });
+    table.append(tbody);
+    $('#statRows').text(outRows.length);
+    $('#statCols').text(allHeaders.length - keepCount);
+    $('#statTime').text(ms.toFixed(1) + 'ms');
+    $('#resultCard').show();
+  }
+
+  // ---------- Export ----------
+  $('#exportCsvBtn').on('click', function(){
+    if (!lastResult) return;
+    const lines = [lastResult.headers.map(csvEsc).join(',')];
+    lastResult.outRows.forEach(r => lines.push(r.map(csvEsc).join(',')));
+    downloadBlob(lines.join('\n'), 'combined.csv', 'text/csv');
+  });
+  function csvEsc(v){
+    v = v === null || v === undefined ? '' : String(v);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+  }
+
+  $('#exportXlsxBtn').on('click', function(){
+    if (!lastResult) return;
+    const aoa = [lastResult.headers, ...lastResult.outRows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Combined');
+    XLSX.writeFile(wb, 'combined.xlsx');
+  });
+
+  function downloadBlob(content, filename, type){
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+});
+</script>
+</body>
+</html>
